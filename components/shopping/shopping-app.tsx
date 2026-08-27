@@ -1290,7 +1290,15 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
 
             <div
               key={selectedTab}
-              ref={shoppingScrollRef}
+              ref={(el) => {
+                shoppingScrollRef.current = el;
+                if (el) {
+                  const saved = shoppingScrollPosRef.current[selectedTab];
+                  if (saved > 0) {
+                    el.scrollTop = saved;
+                  }
+                }
+              }}
               onScroll={(event) => {
                 shoppingScrollPosRef.current[selectedTab] = event.currentTarget.scrollTop;
               }}
