@@ -1214,8 +1214,8 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
 
         {error ? <CheckPhoneDebugErrorCard error={error} debugRawOutput={debugRawOutput} /> : null}
 
-        {/* 列表层：始终渲染（详情/订单打开时仅隐藏），保证返回时滚动位置天然保持 */}
-        <div style={{ display: selectedProduct || activeOrder ? "none" : "contents" }}>
+        {/* 列表层：始终渲染且始终显示（详情/订单以 absolute 浮在其上覆盖），滚动位置天然保持 */}
+        <div style={{ display: "contents" }}>
           <>
             {selectedTab === "home" ? (
               <div style={{ padding: "0 24px", marginTop: "-4px", marginBottom: "16px" }}>
