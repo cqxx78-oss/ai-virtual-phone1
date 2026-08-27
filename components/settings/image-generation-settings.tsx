@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AlertCircle, Camera, ChevronDown, Image, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import type { ImageGenerationSettings as ImageGenerationSettingsType } from "@/lib/settings-types";
 import {
@@ -19,8 +19,25 @@ import {
 import { Alert } from "@/components/ui/feedback";
 import { Input, Select, Textarea, Toggle } from "@/components/ui/form";
 
-const SIZE_OPTIONS = ["auto", "1024x1024", "1024x1536", "1536x1024"];
+const SIZE_PRESETS = ["auto", "1024x1024", "1024x1536", "1536x1024"] as const;
+const SIZE_OPTIONS = [...SIZE_PRESETS, "custom"];
 const QUALITY_OPTIONS = ["auto", "low", "medium", "high"];
+
+/** 判断是否为自定义尺寸（不在预设列表里的合法 WxH 字符串；"custom" 是下拉占位值不算） */
+function isCustomSize(size: string): boolean {
+    return size !== "custom" && !(SIZE_PRESETS as readonly string[]).includes(size);
+}
+
+/** 从 "WxH" 解析宽高（支持 x / X / ×） */
+function parseCustomSize(size: string): { w: string; h: string } | null {
+    const match = /^(\d+)[xX×](\d+)$/.exec(size.trim());
+    if (!match) return null;
+    return { w: match[1], h: match[2] };
+}
+
+function greatestCommonDivisor(a: number, b: number): number {
+    return b === 0 ? a : greatestCommonDivisor(b, a % b);
+}
 
 // Some relay APIs (e.g. dzzi 的 gpt-image-2) ignore the `size` param and pick
 // their own aspect ratio. As a fallback we append a natural-language ratio hint
@@ -33,6 +50,24 @@ const SIZE_RATIO_HINTS: Record<string, string> = {
     "1536x1024": "横向 3:2 构图，horizontal landscape composition",
 };
 
+/** 为任意尺寸生成【画面比例】构图提示：预设直接查表，自定义 WxH 按宽高比生成 */
+function ratioHintForSize(size: string): string | undefined {
+    if (SIZE_RATIO_HINTS[size]) return SIZE_RATIO_HINTS[size];
+    const parsed = parseCustomSize(size);
+    if (!parsed) return undefined;
+    const w = Number(parsed.w);
+    const h = Number(parsed.h);
+    if (!w || !h) return undefined;
+    const g = greatestCommonDivisor(w, h);
+    const rw = w / g;
+    const rh = h / g;
+    if (rw === rh) return "正方形 1:1 构图，square 1:1 composition";
+    if (rw === 2 && rh === 3) return "竖向 2:3 构图，vertical portrait composition";
+    if (rw === 3 && rh === 2) return "横向 3:2 构图，horizontal landscape composition";
+    if (rw > rh) return `${rw}:${rh} 构图，landscape ${rw}:${rh} composition`;
+    return `${rw}:${rh} 构图，portrait ${rw}:${rh} composition`;
+}
+
 // Remove any auto-appended ratio hint line(s), preserving the user's own text.
 function stripRatioHint(text: string): string {
     return text.replace(new RegExp(`\\s*${RATIO_HINT_MARKER}[^\\n]*`, "g"), "").replace(/\s+$/, "");
@@ -42,7 +77,7 @@ function stripRatioHint(text: string): string {
 // previous hint). `auto` strips the hint entirely.
 function withRatioHint(extraPrompt: string, size: string): string {
     const base = stripRatioHint(extraPrompt);
-    const hint = SIZE_RATIO_HINTS[size];
+    const hint = ratioHintForSize(size);
     if (!hint) return base;
     return base ? `${base}\n${RATIO_HINT_MARKER}${hint}` : `${RATIO_HINT_MARKER}${hint}`;
 }
@@ -63,6 +98,9 @@ export function ImageGenerationSettings() {
     const [isTesting, setIsTesting] = useState(false);
     const [status, setStatus] = useState<Status | null>(null);
     const [testPreviewUrl, setTestPreviewUrl] = useState<string | null>(null);
+    const [customW, setCustomW] = useState("2048");
+    const [customH, setCustomH] = useState("2048");
+    const lastCustomSize = useRef("2048x2048");
 
     useEffect(() => {
         // Sync the ratio hint to the saved size on load, so the hint is present
@@ -78,6 +116,16 @@ export function ImageGenerationSettings() {
         }
         setCharacters(loadCharacters());
     }, []);
+
+    // 自定义尺寸：size 变化时把宽高同步进输入框（用户输入也会触发，值相同则无副作用）
+    useEffect(() => {
+        if (!isCustomSize(settings.size)) return;
+        const parsed = parseCustomSize(settings.size);
+        if (!parsed) return;
+        lastCustomSize.current = `${parsed.w}x${parsed.h}`;
+        setCustomW(parsed.w);
+        setCustomH(parsed.h);
+    }, [settings.size]);
 
     useEffect(() => {
         let cancelled = false;
@@ -116,6 +164,35 @@ export function ImageGenerationSettings() {
     // `size` param still produce the requested orientation.
     const applySize = useCallback((size: string) => {
         persist({ ...settings, size, extraPrompt: withRatioHint(settings.extraPrompt, size) });
+    }, [persist, settings]);
+
+    // 尺寸下拉：切到「自定义」时用上次/当前的自定义分辨率落进 size（预设值不作自定义起点）；
+    // 切回预设走 applySize（自动换比例提示）。
+    const selectSize = useCallback((value: string) => {
+        if (value !== "custom") {
+            applySize(value);
+            return;
+        }
+        const parsed = parseCustomSize(settings.size);
+        const next = isCustomSize(settings.size) && parsed ? `${parsed.w}x${parsed.h}` : lastCustomSize.current;
+        const [w, h] = next.split("x");
+        setCustomW(w || "2048");
+        setCustomH(h || "2048");
+        lastCustomSize.current = next;
+        applySize(next);
+    }, [applySize, settings]);
+
+    // 自定义宽/高输入：两个都合法（2~5 位数字）才写进 size 并刷新比例提示
+    const updateCustomSize = useCallback((w: string, h: string) => {
+        const nw = w.replace(/\D/g, "");
+        const nh = h.replace(/\D/g, "");
+        setCustomW(nw);
+        setCustomH(nh);
+        if (/^\d{2,5}$/.test(nw) && /^\d{2,5}$/.test(nh)) {
+            const next = `${nw}x${nh}`;
+            lastCustomSize.current = next;
+            persist({ ...settings, size: next, extraPrompt: withRatioHint(settings.extraPrompt, next) });
+        }
     }, [persist, settings]);
 
     const updateImageHosting = useCallback((patch: Partial<ImageGenerationSettingsType["imageHosting"]>) => {
@@ -295,8 +372,8 @@ export function ImageGenerationSettings() {
                 <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
                         <label className="menu-desc ml-1">尺寸</label>
-                        <Select value={settings.size} onChange={(event) => applySize(event.target.value)}>
-                            {SIZE_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                        <Select value={isCustomSize(settings.size) ? "custom" : settings.size} onChange={(event) => selectSize(event.target.value)}>
+                            {SIZE_OPTIONS.map(option => <option key={option} value={option}>{option === "custom" ? "自定义…" : option}</option>)}
                         </Select>
                     </div>
                     <div className="flex flex-col gap-1">
@@ -306,6 +383,35 @@ export function ImageGenerationSettings() {
                         </Select>
                     </div>
                 </div>
+
+                {isCustomSize(settings.size) && (
+                    <div className="flex flex-col gap-1">
+                        <label className="menu-desc ml-1">自定义分辨率（宽 × 高）</label>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                type="text"
+                                inputMode="numeric"
+                                value={customW}
+                                onChange={(event) => updateCustomSize(event.target.value, customH)}
+                                placeholder="宽，如 2048"
+                                className="flex-1"
+                            />
+                            <span className="menu-desc shrink-0">×</span>
+                            <Input
+                                type="text"
+                                inputMode="numeric"
+                                value={customH}
+                                onChange={(event) => updateCustomSize(customW, event.target.value)}
+                                placeholder="高，如 2048"
+                                className="flex-1"
+                            />
+                            <span className="menu-desc shrink-0">px</span>
+                        </div>
+                        <span className="menu-desc ml-1 opacity-70">
+                            以「宽x高」格式原样发给生图 API；宽高各填 2~5 位数字才生效，超出模型支持范围会被 API 拒绝。
+                        </span>
+                    </div>
+                )}
 
                 <div className="flex flex-col gap-1">
                     <label className="menu-desc ml-1">补充提示词</label>
