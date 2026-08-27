@@ -439,6 +439,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
   const blackMarketTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shoppingScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollRestoreFrameRef = useRef<number | null>(null);
+  const shoppingScrollPosRef = useRef<Record<ShoppingTabId, number>>({ home: 0, orders: 0, cart: 0, account: 0 });
   const wasVisibleRef = useRef(visible);
 
   useEffect(() => {
@@ -629,8 +630,20 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     resetShoppingScroll();
   }, [selectedTab]);
 
+  // 从商品详情/订单详情返回列表时，列表会重新挂载，恢复该 tab 上次的滚动位置
+  useLayoutEffect(() => {
+    if (selectedProduct || activeOrder) return;
+    const scrollEl = shoppingScrollRef.current;
+    if (!scrollEl) return;
+    const saved = shoppingScrollPosRef.current[selectedTab];
+    if (saved > 0) {
+      scrollEl.scrollTop = saved;
+    }
+  }, [selectedProduct, activeOrder, selectedTab]);
+
   function selectShoppingTab(tabId: ShoppingTabId) {
     resetShoppingScroll();
+    shoppingScrollPosRef.current[tabId] = 0;
     setTranslationPreview(null);
     setSelectedTab(tabId);
   }
@@ -1278,6 +1291,9 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
             <div
               key={selectedTab}
               ref={shoppingScrollRef}
+              onScroll={(event) => {
+                shoppingScrollPosRef.current[selectedTab] = event.currentTarget.scrollTop;
+              }}
               className="cp-shopping-scroll"
               style={{ padding: "0 24px 120px", display: "flex", flexDirection: "column", gap: "32px", marginTop: selectedTab === "home" ? 0 : "8px" }}
             >
