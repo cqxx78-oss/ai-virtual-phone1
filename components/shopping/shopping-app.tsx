@@ -638,6 +638,14 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     const saved = shoppingScrollPosRef.current[selectedTab];
     if (saved > 0) {
       scrollEl.scrollTop = saved;
+      // 双保险：等浏览器完成一次布局后再设一次，防止异步内容把位置顶回顶部
+      const frame = window.requestAnimationFrame(() => {
+        const el = shoppingScrollRef.current;
+        if (el) {
+          el.scrollTop = saved;
+        }
+      });
+      return () => window.cancelAnimationFrame(frame);
     }
   }, [selectedProduct, activeOrder, selectedTab]);
 
@@ -1206,7 +1214,8 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
 
         {error ? <CheckPhoneDebugErrorCard error={error} debugRawOutput={debugRawOutput} /> : null}
 
-        {!selectedProduct && !activeOrder && (
+        {/* 列表层：始终渲染（详情/订单打开时仅隐藏），保证返回时滚动位置天然保持 */}
+        <div style={{ display: selectedProduct || activeOrder ? "none" : "contents" }}>
           <>
             {selectedTab === "home" ? (
               <div style={{ padding: "0 24px", marginTop: "-4px", marginBottom: "16px" }}>
@@ -1559,7 +1568,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
               </button>
             ) : null}
           </>
-        )}
+        </div>
 
         {selectedProduct && (
           <div style={{ position: "absolute", inset: 0, zIndex: 20, background: "#fff", display: "flex", flexDirection: "column", overflowY: "auto" }}>
