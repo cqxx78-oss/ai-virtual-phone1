@@ -8,7 +8,7 @@ import { ChatRoom } from "./chat-room";
 import { MascotChatRoom } from "./mascot-chat-room";
 import { UserProfilePanel } from "./user-profile-panel";
 import { MessageCircle, Users, Aperture, UserRound } from "lucide-react";
-import { ChatSession, loadChatSessions, pushChatMessage, hydrateChatStorage } from "@/lib/chat-storage";
+import { ChatSession, loadChatSessions, pushChatMessage, hydrateChatStorage, markSessionRead, setActiveChatSessionId } from "@/lib/chat-storage";
 import { notifyMascotPageContext } from "@/lib/mascot-events";
 import { loadCharacters } from "@/lib/character-storage";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
@@ -113,6 +113,9 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     // Notify parent of session changes + cache visited session + push mascot context
     useEffect(() => {
         onSessionChange?.(activeSession);
+        // 未读提示：登记当前打开的会话，并把该会话未读计数清零
+        setActiveChatSessionId(activeSession?.id ?? null);
+        if (activeSession) markSessionRead(activeSession.id);
         if (activeSession) {
             setActiveMascot(false);
             setVisitedSessions(prev => {

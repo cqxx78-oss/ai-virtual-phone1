@@ -694,6 +694,11 @@ function SessionItem({ session, onSelect, isPinned }: { session: ChatSession, on
                     <span className="ts-13 text-[var(--c-text)] opacity-80 truncate font-normal">
                         {preview || getLastNonEmptyPreview(session.id)}
                     </span>
+                    {(session.unreadCount || 0) > 0 && (
+                        <span className="chat-unread-badge shrink-0">
+                            {(session.unreadCount || 0) > 99 ? "99+" : session.unreadCount}
+                        </span>
+                    )}
                 </div>
             </div>
         </div>

@@ -1114,6 +1114,26 @@ export function createToolExecutionId(): string {
     return `toolrun_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/** 当前正在打开的会话 id：未读计数时豁免"正在看"的会话。 */
+let _activeSessionId: string | null = null;
+
+export function setActiveChatSessionId(sessionId: string | null): void {
+    _activeSessionId = sessionId;
+}
+
+/** 把某会话标记为已读（清零未读计数并通知列表刷新）。 */
+export function markSessionRead(sessionId: string): void {
+    if (!sessionId) return;
+    const sessions = loadChatSessions();
+    const sess = sessions.find(s => s.id === sessionId);
+    if (!sess || !sess.unreadCount) return;
+    sess.unreadCount = 0;
+    saveChatSessions(sessions);
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("chat-messages-updated", { detail: { sessionId } }));
+    }
+}
+
 export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "status"> & {
     status?: ChatMessageStatus;
     createdAt?: string;
@@ -1145,6 +1165,10 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
             sessions[sessIdx].lastMessagePreview = preview;
         }
         sessions[sessIdx].updatedAt = newMsg.createdAt;
+        // 未读计数：只对角色/他方发来的消息计数；正在打开该会话时不计数
+        if (newMsg.role === "assistant" && newMsg.sessionId !== _activeSessionId) {
+            sessions[sessIdx].unreadCount = (sessions[sessIdx].unreadCount || 0) + 1;
+        }
         saveChatSessions(sessions);
     }
 
