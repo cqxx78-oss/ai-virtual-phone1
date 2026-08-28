@@ -411,7 +411,6 @@ export function ApiSettings() {
                                                     />
                                                 )}
                                             </div>
-                                        </div>
 
                                         <div className="flex gap-3 mt-1">
                                             <button
