@@ -653,40 +653,7 @@ export const DEFAULT_IMAGE_GENERATION_SETTINGS: ImageGenerationSettings = {
     },
 };
 
-function normalizeImageGenerationSettings(settings: Partial<ImageGenerationSettings> | null | undefined): ImageGenerationSettings {
-    const refs = settings?.characterReferences && typeof settings.characterReferences === "object"
-        ? settings.characterReferences
-        : {};
-    const requestMode = settings?.requestMode === "server" || settings?.requestMode === "direct"
-        ? settings.requestMode
-        : DEFAULT_IMAGE_GENERATION_SETTINGS.requestMode;
-    const hosting: Partial<ImageGenerationSettings["imageHosting"]> = settings?.imageHosting && typeof settings.imageHosting === "object"
-        ? settings.imageHosting
-        : {};
-    const provider = hosting.provider === "imgbb" ? "imgbb" : "none";
-    const defaultExpirationSeconds = typeof hosting.defaultExpirationSeconds === "number"
-        ? Math.max(0, Math.min(15552000, Math.floor(hosting.defaultExpirationSeconds)))
-        : DEFAULT_IMAGE_GENERATION_SETTINGS.imageHosting.defaultExpirationSeconds;
-    const maxUploadBytes = typeof hosting.maxUploadBytes === "number"
-        ? Math.max(64 * 1024, Math.min(32 * 1024 * 1024, Math.floor(hosting.maxUploadBytes)))
-        : DEFAULT_IMAGE_GENERATION_SETTINGS.imageHosting.maxUploadBytes;
-    return {
-        ...DEFAULT_IMAGE_GENERATION_SETTINGS,
-        ...(settings || {}),
-        requestMode,
-        characterReferences: refs,
-        imageHosting: {
-            ...DEFAULT_IMAGE_GENERATION_SETTINGS.imageHosting,
-            ...hosting,
-            provider,
-            defaultExpirationSeconds,
-            maxUploadBytes,
-            autoConvertToWebp: hosting.autoConvertToWebp !== false,
-            allowMascotUpload: hosting.allowMascotUpload === true,
-            imgbbApiKey: typeof hosting.imgbbApiKey === "string" ? hosting.imgbbApiKey : "",
-        },
-    };
-}
+
 
 export function loadImageGenerationSettings(): ImageGenerationSettings {
     if (typeof window === "undefined") return { ...DEFAULT_IMAGE_GENERATION_SETTINGS };

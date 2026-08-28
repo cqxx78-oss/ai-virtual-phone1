@@ -161,8 +161,22 @@ export type ImageHostingSettings = {
     allowMascotUpload: boolean;
 };
 
+export type ImageGenerationProfile = {
+    id: string;
+    name?: string;
+    requestMode: ImageGenerationRequestMode;
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    size: string;
+    quality: string;
+    extraPrompt: string;
+};
+
 export type ImageGenerationSettings = {
     enabled: boolean;
+    activeProfileId?: string;
+    profiles?: ImageGenerationProfile[];
     requestMode: ImageGenerationRequestMode;
     apiKey: string;
     baseUrl: string;

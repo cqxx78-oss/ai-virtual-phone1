@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { AlertCircle, Camera, ChevronDown, Image, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
-import type { ImageGenerationSettings as ImageGenerationSettingsType } from "@/lib/settings-types";
+import { useCallback, useEffect, useMemo, useRef, useState, useContext, type CSSProperties } from "react";
+import { AlertCircle, Camera, Check, ChevronDown, FileEdit, Image as ImageIcon, Plus, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { SettingsContext } from "../phone-settings-app";
+import type { ImageGenerationProfile, ImageGenerationSettings as ImageGenerationSettingsType } from "@/lib/settings-types";
 import {
     DEFAULT_IMAGE_GENERATION_SETTINGS,
     loadImageGenerationSettings,
@@ -17,18 +18,19 @@ import {
     generateImageFromConfiguredApi,
 } from "@/lib/image-generation-service";
 import { Alert } from "@/components/ui/feedback";
+import { ConfirmDialog } from "@/components/ui/modal";
 import { Input, Select, Textarea, Toggle } from "@/components/ui/form";
 
 const SIZE_PRESETS = ["auto", "1024x1024", "1024x1536", "1536x1024"] as const;
 const SIZE_OPTIONS = [...SIZE_PRESETS, "custom"];
 const QUALITY_OPTIONS = ["auto", "low", "medium", "high"];
 
-/** 判断是否为自定义尺寸（不在预设列表里的合法 WxH 字符串；"custom" 是下拉占位值不算） */
+/** 判断是否为自定义尺寸 */
 function isCustomSize(size: string): boolean {
     return size !== "custom" && !(SIZE_PRESETS as readonly string[]).includes(size);
 }
 
-/** 从 "WxH" 解析宽高（支持 x / X / ×） */
+/** 从 "WxH" 解析宽高 */
 function parseCustomSize(size: string): { w: string; h: string } | null {
     const match = /^(\d+)[xX×](\d+)$/.exec(size.trim());
     if (!match) return null;
@@ -39,10 +41,6 @@ function greatestCommonDivisor(a: number, b: number): number {
     return b === 0 ? a : greatestCommonDivisor(b, a % b);
 }
 
-// Some relay APIs (e.g. dzzi 的 gpt-image-2) ignore the `size` param and pick
-// their own aspect ratio. As a fallback we append a natural-language ratio hint
-// to the prompt, which these models DO respect. The marker lets us replace the
-// previously-appended hint instead of stacking them when the size changes.
 const RATIO_HINT_MARKER = "【画面比例】";
 const SIZE_RATIO_HINTS: Record<string, string> = {
     "1024x1024": "正方形 1:1 构图，square 1:1 composition",
@@ -50,7 +48,6 @@ const SIZE_RATIO_HINTS: Record<string, string> = {
     "1536x1024": "横向 3:2 构图，horizontal landscape composition",
 };
 
-/** 为任意尺寸生成【画面比例】构图提示：预设直接查表，自定义 WxH 按宽高比生成 */
 function ratioHintForSize(size: string): string | undefined {
     if (SIZE_RATIO_HINTS[size]) return SIZE_RATIO_HINTS[size];
     const parsed = parseCustomSize(size);
@@ -68,64 +65,85 @@ function ratioHintForSize(size: string): string | undefined {
     return `${rw}:${rh} 构图，portrait ${rw}:${rh} composition`;
 }
 
-// Remove any auto-appended ratio hint line(s), preserving the user's own text.
 function stripRatioHint(text: string): string {
     return text.replace(new RegExp(`\\s*${RATIO_HINT_MARKER}[^\\n]*`, "g"), "").replace(/\s+$/, "");
 }
 
-// Return the prompt with the ratio hint for `size` appended (replacing any
-// previous hint). `auto` strips the hint entirely.
 function withRatioHint(extraPrompt: string, size: string): string {
     const base = stripRatioHint(extraPrompt);
     const hint = ratioHintForSize(size);
     if (!hint) return base;
     return base ? `${base}\n${RATIO_HINT_MARKER}${hint}` : `${RATIO_HINT_MARKER}${hint}`;
 }
+
 const IMAGE_HOSTING_PROVIDER_OPTIONS = [
     { value: "none", label: "不使用图床" },
     { value: "imgbb", label: "ImgBB" },
 ] as const;
+
 const imageGenerationIconStyle = { "--icon-color": "#0EA5E9" } as CSSProperties;
 
 type Status = { success: boolean; message: string };
 
 export function ImageGenerationSettings() {
+    const { setSubpageRightAction } = useContext(SettingsContext);
     const [settings, setSettings] = useState<ImageGenerationSettingsType>(DEFAULT_IMAGE_GENERATION_SETTINGS);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [isNewProfile, setIsNewProfile] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
     const [characters, setCharacters] = useState<Character[]>([]);
     const [referencePreviews, setReferencePreviews] = useState<Record<string, string>>({});
-    const [models, setModels] = useState<string[]>([]);
-    const [isFetchingModels, setIsFetchingModels] = useState(false);
-    const [isTesting, setIsTesting] = useState(false);
-    const [status, setStatus] = useState<Status | null>(null);
-    const [testPreviewUrl, setTestPreviewUrl] = useState<string | null>(null);
+    
+    // Testing & Fetching states
+    const [isFetchingModels, setIsFetchingModels] = useState<Record<string, boolean>>({});
+    const [fetchedModels, setFetchedModels] = useState<Record<string, string[]>>({});
+    const [isTesting, setIsTesting] = useState<Record<string, boolean>>({});
+    const [status, setStatus] = useState<Record<string, Status | null>>({});
+    const [testPreviewUrl, setTestPreviewUrl] = useState<Record<string, string | null>>({});
+    
     const [customW, setCustomW] = useState("2048");
     const [customH, setCustomH] = useState("2048");
     const lastCustomSize = useRef("2048x2048");
 
     useEffect(() => {
-        // Sync the ratio hint to the saved size on load, so the hint is present
-        // by default (not only after the user manually switches the size).
         const loaded = loadImageGenerationSettings();
-        const syncedExtra = withRatioHint(loaded.extraPrompt, loaded.size);
-        if (syncedExtra !== loaded.extraPrompt) {
-            const next = { ...loaded, extraPrompt: syncedExtra };
-            saveImageGenerationSettings(next);
-            setSettings(next);
-        } else {
-            setSettings(loaded);
-        }
+        setSettings(loaded);
         setCharacters(loadCharacters());
     }, []);
 
-    // 自定义尺寸：size 变化时把宽高同步进输入框（用户输入也会触发，值相同则无副作用）
+    const profiles = useMemo(() => {
+        return settings.profiles && settings.profiles.length > 0
+            ? settings.profiles
+            : [{
+                id: "img-profile-default",
+                name: "默认生图方案",
+                requestMode: settings.requestMode,
+                apiKey: settings.apiKey,
+                baseUrl: settings.baseUrl,
+                model: settings.model,
+                size: settings.size,
+                quality: settings.quality,
+                extraPrompt: settings.extraPrompt,
+            }];
+    }, [settings]);
+
+    const activeProfileId = settings.activeProfileId || profiles[0]?.id || "img-profile-default";
+    const editingProfile = useMemo(() => {
+        if (!editingId) return null;
+        return profiles.find(p => p.id === editingId) || null;
+    }, [editingId, profiles]);
+
+    // 同步自定义宽高
     useEffect(() => {
-        if (!isCustomSize(settings.size)) return;
-        const parsed = parseCustomSize(settings.size);
+        if (!editingProfile) return;
+        if (!isCustomSize(editingProfile.size)) return;
+        const parsed = parseCustomSize(editingProfile.size);
         if (!parsed) return;
         lastCustomSize.current = `${parsed.w}x${parsed.h}`;
         setCustomW(parsed.w);
         setCustomH(parsed.h);
-    }, [settings.size]);
+    }, [editingProfile?.size]);
 
     useEffect(() => {
         let cancelled = false;
@@ -146,7 +164,9 @@ export function ImageGenerationSettings() {
 
     useEffect(() => {
         return () => {
-            if (testPreviewUrl) URL.revokeObjectURL(testPreviewUrl);
+            Object.values(testPreviewUrl).forEach(url => {
+                if (url) URL.revokeObjectURL(url);
+            });
         };
     }, [testPreviewUrl]);
 
@@ -155,35 +175,133 @@ export function ImageGenerationSettings() {
         saveImageGenerationSettings(next);
     }, []);
 
-    const updateSettings = useCallback((patch: Partial<ImageGenerationSettingsType>) => {
-        persist({ ...settings, ...patch });
-    }, [persist, settings]);
+    const updateProfile = useCallback((profileId: string, patch: Partial<ImageGenerationProfile>) => {
+        const nextProfiles = profiles.map(p => {
+            if (p.id !== profileId) return p;
+            const updated = { ...p, ...patch };
+            if (patch.size !== undefined && patch.extraPrompt === undefined) {
+                updated.extraPrompt = withRatioHint(updated.extraPrompt, updated.size);
+            }
+            return updated;
+        });
 
-    // Changing the size also refreshes the auto-appended ratio hint in the
-    // 补充提示词 box (replacing any previous hint), so models that ignore the
-    // `size` param still produce the requested orientation.
-    const applySize = useCallback((size: string) => {
-        persist({ ...settings, size, extraPrompt: withRatioHint(settings.extraPrompt, size) });
-    }, [persist, settings]);
+        const activeId = settings.activeProfileId || profiles[0]?.id;
+        const nextActive = nextProfiles.find(p => p.id === activeId) || nextProfiles[0];
 
-    // 尺寸下拉：切到「自定义」时用上次/当前的自定义分辨率落进 size（预设值不作自定义起点）；
-    // 切回预设走 applySize（自动换比例提示）。
-    const selectSize = useCallback((value: string) => {
+        persist({
+            ...settings,
+            profiles: nextProfiles,
+            requestMode: nextActive.requestMode,
+            apiKey: nextActive.apiKey,
+            baseUrl: nextActive.baseUrl,
+            model: nextActive.model,
+            size: nextActive.size,
+            quality: nextActive.quality,
+            extraPrompt: nextActive.extraPrompt,
+        });
+    }, [persist, profiles, settings]);
+
+    const addProfile = useCallback(() => {
+        const newProfile: ImageGenerationProfile = {
+            id: `img-profile-${Date.now()}`,
+            name: "新方案",
+            requestMode: "direct",
+            apiKey: "",
+            baseUrl: "https://api.openai.com/v1",
+            model: "gpt-image-2",
+            size: "1024x1024",
+            quality: "auto",
+            extraPrompt: withRatioHint("", "1024x1024"),
+        };
+        const nextProfiles = [...profiles, newProfile];
+        persist({
+            ...settings,
+            profiles: nextProfiles,
+        });
+        setIsNewProfile(true);
+        setEditingId(newProfile.id);
+    }, [persist, profiles, settings]);
+
+    const removeProfile = useCallback((profileId: string) => {
+        const nextProfiles = profiles.filter(p => p.id !== profileId);
+        if (nextProfiles.length === 0) {
+            nextProfiles.push({
+                id: `img-profile-${Date.now()}`,
+                name: "默认生图方案",
+                requestMode: "direct",
+                apiKey: "",
+                baseUrl: "https://api.openai.com/v1",
+                model: "gpt-image-2",
+                size: "1024x1024",
+                quality: "auto",
+                extraPrompt: "",
+            });
+        }
+        let nextActiveId = settings.activeProfileId;
+        if (nextActiveId === profileId || !nextProfiles.some(p => p.id === nextActiveId)) {
+            nextActiveId = nextProfiles[0].id;
+        }
+        const active = nextProfiles.find(p => p.id === nextActiveId) || nextProfiles[0];
+
+        persist({
+            ...settings,
+            activeProfileId: nextActiveId,
+            profiles: nextProfiles,
+            requestMode: active.requestMode,
+            apiKey: active.apiKey,
+            baseUrl: active.baseUrl,
+            model: active.model,
+            size: active.size,
+            quality: active.quality,
+            extraPrompt: active.extraPrompt,
+        });
+    }, [persist, profiles, settings]);
+
+    const setActiveProfile = useCallback((profileId: string) => {
+        const active = profiles.find(p => p.id === profileId);
+        if (!active) return;
+        persist({
+            ...settings,
+            activeProfileId: profileId,
+            requestMode: active.requestMode,
+            apiKey: active.apiKey,
+            baseUrl: active.baseUrl,
+            model: active.model,
+            size: active.size,
+            quality: active.quality,
+            extraPrompt: active.extraPrompt,
+        });
+    }, [persist, profiles, settings]);
+
+    // 头部新增按钮
+    useEffect(() => {
+        setSubpageRightAction("image_generation",
+            <button
+                onClick={addProfile}
+                className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[20px] bg-black px-4 text-xs font-bold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow-md active:scale-95 focus:outline-none"
+            >
+                <Plus size={15} strokeWidth={1.8} />
+                <span>新增生图方案</span>
+            </button>
+        );
+        return () => setSubpageRightAction("image_generation", null);
+    }, [addProfile, setSubpageRightAction]);
+
+    const selectSize = useCallback((profile: ImageGenerationProfile, value: string) => {
         if (value !== "custom") {
-            applySize(value);
+            updateProfile(profile.id, { size: value });
             return;
         }
-        const parsed = parseCustomSize(settings.size);
-        const next = isCustomSize(settings.size) && parsed ? `${parsed.w}x${parsed.h}` : lastCustomSize.current;
+        const parsed = parseCustomSize(profile.size);
+        const next = isCustomSize(profile.size) && parsed ? `${parsed.w}x${parsed.h}` : lastCustomSize.current;
         const [w, h] = next.split("x");
         setCustomW(w || "2048");
         setCustomH(h || "2048");
         lastCustomSize.current = next;
-        applySize(next);
-    }, [applySize, settings]);
+        updateProfile(profile.id, { size: next });
+    }, [updateProfile]);
 
-    // 自定义宽/高输入：两个都合法（2~5 位数字）才写进 size 并刷新比例提示
-    const updateCustomSize = useCallback((w: string, h: string) => {
+    const updateCustomSize = useCallback((profile: ImageGenerationProfile, w: string, h: string) => {
         const nw = w.replace(/\D/g, "");
         const nh = h.replace(/\D/g, "");
         setCustomW(nw);
@@ -191,9 +309,9 @@ export function ImageGenerationSettings() {
         if (/^\d{2,5}$/.test(nw) && /^\d{2,5}$/.test(nh)) {
             const next = `${nw}x${nh}`;
             lastCustomSize.current = next;
-            persist({ ...settings, size: next, extraPrompt: withRatioHint(settings.extraPrompt, next) });
+            updateProfile(profile.id, { size: next });
         }
-    }, [persist, settings]);
+    }, [updateProfile]);
 
     const updateImageHosting = useCallback((patch: Partial<ImageGenerationSettingsType["imageHosting"]>) => {
         persist({
@@ -205,46 +323,57 @@ export function ImageGenerationSettings() {
         });
     }, [persist, settings]);
 
-    const likelyModels = useMemo(() => filterLikelyImageModels(models), [models]);
-
-    const fetchModels = async () => {
-        setStatus(null);
-        if (!settings.apiKey.trim() || !settings.baseUrl.trim()) {
-            setStatus({ success: false, message: "请先填写 Base URL 和 API Key。" });
+    const fetchModels = async (profile: ImageGenerationProfile) => {
+        setStatus(prev => ({ ...prev, [profile.id]: null }));
+        if (!profile.apiKey.trim() || !profile.baseUrl.trim()) {
+            setStatus(prev => ({ ...prev, [profile.id]: { success: false, message: "请先填写 Base URL 和 API Key。" } }));
             return;
         }
-        setIsFetchingModels(true);
+        setIsFetchingModels(prev => ({ ...prev, [profile.id]: true }));
         try {
-            const fetched = await fetchImageGenerationModels(settings);
-            setModels(fetched);
-            setStatus({
-                success: true,
-                message: fetched.length > 0 ? `已拉取 ${fetched.length} 个模型。` : "接口返回为空，可手动填写模型名。",
-            });
+            const fetched = await fetchImageGenerationModels(profile);
+            setFetchedModels(prev => ({ ...prev, [profile.id]: fetched }));
+            setStatus(prev => ({
+                ...prev,
+                [profile.id]: {
+                    success: true,
+                    message: fetched.length > 0 ? `已拉取 ${fetched.length} 个模型。` : "接口返回为空，可手动填写模型名。",
+                },
+            }));
         } catch (err) {
-            setModels([]);
-            setStatus({ success: false, message: err instanceof Error ? err.message : String(err) });
+            setFetchedModels(prev => ({ ...prev, [profile.id]: [] }));
+            setStatus(prev => ({ ...prev, [profile.id]: { success: false, message: err instanceof Error ? err.message : String(err) } }));
         } finally {
-            setIsFetchingModels(false);
+            setIsFetchingModels(prev => ({ ...prev, [profile.id]: false }));
         }
     };
 
-    const testGeneration = async () => {
-        setStatus(null);
-        setIsTesting(true);
+    const testGeneration = async (profile: ImageGenerationProfile) => {
+        setStatus(prev => ({ ...prev, [profile.id]: null }));
+        setIsTesting(prev => ({ ...prev, [profile.id]: true }));
         try {
             const result = await generateImageFromConfiguredApi({
                 description: "一张放在桌面上的白色咖啡杯，柔和自然光，真实照片风格",
-                settings: { ...settings, enabled: true },
+                settings: {
+                    ...settings,
+                    enabled: true,
+                    requestMode: profile.requestMode,
+                    apiKey: profile.apiKey,
+                    baseUrl: profile.baseUrl,
+                    model: profile.model,
+                    size: profile.size,
+                    quality: profile.quality,
+                    extraPrompt: profile.extraPrompt,
+                },
             });
             if (!result) throw new Error("图像生成未返回结果。");
-            if (testPreviewUrl) URL.revokeObjectURL(testPreviewUrl);
-            setTestPreviewUrl(URL.createObjectURL(result.blob));
-            setStatus({ success: true, message: "测试生图成功。" });
-        } catch (err) {
-            setStatus({ success: false, message: err instanceof Error ? err.message : String(err) });
+            if (testPreviewUrl[profile.id]) URL.revokeObjectURL(testPreviewUrl[profile.id]!);
+            setTestPreviewUrl(prev => ({ ...prev, [profile.id]: URL.createObjectURL(result.blob) }));
+            setStatus(prev => ({ ...prev, [profile.id]: { success: true, message: "测试生图成功。" } }));
+        } catch (err) { 
+            setStatus(prev => ({ ...prev, [profile.id]: { success: false, message: err instanceof Error ? err.message : String(err) } }));
         } finally {
-            setIsTesting(false);
+            setIsTesting(prev => ({ ...prev, [profile.id]: false }));
         }
     };
 
@@ -276,6 +405,7 @@ export function ImageGenerationSettings() {
                 <h2 className="m-0 mx-2 ts-28 font-bold italic leading-none text-black">Image Generation</h2>
             </div>
 
+            {/* 全局自动生图开关 */}
             <div className="menu-group">
                 <div className="menu-item">
                     <span className="card-icon" style={imageGenerationIconStyle}>
@@ -283,176 +413,323 @@ export function ImageGenerationSettings() {
                     </span>
                     <span className="settings-tools-menu-copy">
                         <span className="menu-label appearance-menu-item-label">启用自动生图</span>
-                        <span className="menu-desc settings-tools-menu-desc">角色输出照片标签时自动调用图像生成 API。</span>
+                        <span className="menu-desc settings-tools-menu-desc">角色输出照片标签时自动调用当前激活的生图方案。</span>
                     </span>
                     <span className="menu-right settings-tools-menu-toggle">
-                        <Toggle checked={settings.enabled} onChange={(enabled) => updateSettings({ enabled })} className="settings-toggle-control" />
+                        <Toggle
+                            checked={settings.enabled}
+                            onChange={(enabled) => persist({ ...settings, enabled })}
+                            className="settings-toggle-control"
+                        />
                     </span>
                 </div>
             </div>
 
-            <div className="menu-group p-4 flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                    <label className="menu-desc ml-1">请求方式</label>
-                    <Select
-                        value={settings.requestMode}
-                        onChange={(event) => updateSettings({
-                            requestMode: event.target.value as ImageGenerationSettingsType["requestMode"],
-                        })}
-                    >
-                        <option value="server">服务端转发</option>
-                        <option value="direct">浏览器直连</option>
-                    </Select>
-                    <span className="menu-desc ml-1">
-                        浏览器直连会从当前设备直接请求生图 API，可绕开部署平台函数超时；需要接口允许跨域。
-                    </span>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                    <label className="menu-desc ml-1">Base URL</label>
-                    <Input
-                        type="url"
-                        value={settings.baseUrl}
-                        onChange={(event) => updateSettings({ baseUrl: event.target.value })}
-                        placeholder="https://api.example.com/v1"
-                    />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                    <label className="menu-desc ml-1">API Key</label>
-                    <Input
-                        type="password"
-                        value={settings.apiKey}
-                        onChange={(event) => updateSettings({ apiKey: event.target.value })}
-                        placeholder="sk-..."
-                    />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                    <label className="menu-desc ml-1">模型名</label>
-                    <div className="flex gap-2">
-                        {/* 单框合一:可手动输入;拉取到模型后右侧出现下拉箭头,点开原生选择器选中即回填 */}
-                        <div className="relative flex-1">
-                            <Input
-                                type="text"
-                                value={settings.model}
-                                onChange={(event) => updateSettings({ model: event.target.value })}
-                                placeholder="gpt-image-2 / image2 / chatgpt-image-latest"
-                                className={likelyModels.length > 0 ? "w-full pr-9" : "w-full"}
-                            />
-                            {likelyModels.length > 0 && (
-                                <>
-                                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-60" />
-                                    <select
-                                        aria-label="选择拉取到的模型"
-                                        value=""
-                                        onChange={(event) => {
-                                            if (event.target.value) updateSettings({ model: event.target.value });
-                                        }}
-                                        className="absolute inset-y-0 right-0 w-10 cursor-pointer opacity-0"
-                                    >
-                                        <option value="">选择拉取到的模型...</option>
-                                        {likelyModels.map(model => <option key={model} value={model}>{model}</option>)}
-                                    </select>
-                                </>
-                            )}
-                        </div>
-                        <button
-                            type="button"
-                            onClick={fetchModels}
-                            disabled={isFetchingModels}
-                            className="ui-btn ui-btn-soft-action shrink-0"
-                        >
-                            <RefreshCw size={16} className={isFetchingModels ? "animate-spin" : ""} />
-                            {isFetchingModels ? "拉取中" : "拉取模型"}
-                        </button>
-                    </div>
+            {/* 生图方案卡片网格 */}
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between px-1">
+                    <p className="settings-menu-section-title !m-0">生图方案列表</p>
+                    <span className="menu-desc text-xs">点击卡片设为当前使用</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                        <label className="menu-desc ml-1">尺寸</label>
-                        <Select value={isCustomSize(settings.size) ? "custom" : settings.size} onChange={(event) => selectSize(event.target.value)}>
-                            {SIZE_OPTIONS.map(option => <option key={option} value={option}>{option === "custom" ? "自定义…" : option}</option>)}
-                        </Select>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="menu-desc ml-1">质量</label>
-                        <Select value={settings.quality} onChange={(event) => updateSettings({ quality: event.target.value })}>
-                            {QUALITY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
-                        </Select>
-                    </div>
+                    {profiles.map(profile => {
+                        const isActive = profile.id === activeProfileId;
+                        return (
+                            <div
+                                key={profile.id}
+                                className={`ui-config-card min-w-0 cursor-pointer transition-all ${
+                                    isActive ? "ring-2 ring-black shadow-sm" : ""
+                                }`}
+                                style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between" }}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`选择 ${profile.name || "未命名方案"}`}
+                                onClick={() => setActiveProfile(profile.id)}
+                                onKeyDown={(event) => {
+                                    if (event.target !== event.currentTarget) return;
+                                    if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault();
+                                        setActiveProfile(profile.id);
+                                    }
+                                }}
+                            >
+                                <div className="min-w-0 flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">
+                                            {profile.name || "未命名方案"}
+                                        </span>
+                                        {isActive && (
+                                            <span className="shrink-0 rounded-full bg-black px-1.5 py-0.5 text-[10px] font-medium text-white">
+                                                使用中
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="menu-desc truncate">{profile.model || "未设置模型"}</span>
+                                </div>
+                                <div className="flex gap-2 shrink-0 items-center justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setIsNewProfile(false);
+                                            setEditingId(profile.id);
+                                        }}
+                                        className="ui-link-btn"
+                                        title="编辑方案"
+                                    >
+                                        <FileEdit size={18} />
+                                    </button>
+                                    {profiles.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setConfirmDeleteId(profile.id);
+                                            }}
+                                            className="ui-link-btn"
+                                            data-variant="danger"
+                                            title="删除方案"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
-
-                {isCustomSize(settings.size) && (
-                    <div className="flex flex-col gap-1">
-                        <label className="menu-desc ml-1">自定义分辨率（宽 × 高）</label>
-                        <div className="flex items-center gap-2">
-                            <Input
-                                type="text"
-                                inputMode="numeric"
-                                value={customW}
-                                onChange={(event) => updateCustomSize(event.target.value, customH)}
-                                placeholder="宽，如 2048"
-                                className="flex-1"
-                            />
-                            <span className="menu-desc shrink-0">×</span>
-                            <Input
-                                type="text"
-                                inputMode="numeric"
-                                value={customH}
-                                onChange={(event) => updateCustomSize(customW, event.target.value)}
-                                placeholder="高，如 2048"
-                                className="flex-1"
-                            />
-                            <span className="menu-desc shrink-0">px</span>
-                        </div>
-                        <span className="menu-desc ml-1 opacity-70">
-                            以「宽x高」格式原样发给生图 API；宽高各填 2~5 位数字才生效，超出模型支持范围会被 API 拒绝。
-                        </span>
-                    </div>
-                )}
-
-                <div className="flex flex-col gap-1">
-                    <label className="menu-desc ml-1">补充提示词</label>
-                    <Textarea
-                        value={settings.extraPrompt}
-                        onChange={(event) => updateSettings({ extraPrompt: event.target.value })}
-                        placeholder="会和角色输出的图片描述一起发送给生图模型。"
-                        rows={4}
-                    />
-                    <p className="menu-desc ml-1 opacity-70">
-                        选择尺寸后会自动在末尾追加一句「{RATIO_HINT_MARKER}…」构图提示，用于纠正部分不认 size 参数的接口（如 gpt-image-2）。可手动修改或删除。
-                    </p>
-                </div>
-
-                <div className="flex gap-3">
-                    <button
-                        type="button"
-                        onClick={testGeneration}
-                        disabled={isTesting}
-                        className="ui-btn ui-btn-success flex-1"
-                    >
-                        <Image size={16} />
-                        {isTesting ? "测试中..." : "测试生图"}
-                    </button>
-                </div>
-
-                {status && (
-                    <Alert variant={status.success ? "success" : "danger"}>
-                        <AlertCircle size={16} className="mt-[2px] shrink-0" />
-                        <span className="break-all leading-[1.5]">{status.message}</span>
-                    </Alert>
-                )}
-                {testPreviewUrl && (
-                    <img
-                        src={testPreviewUrl}
-                        alt="测试生图结果"
-                        className="max-h-[220px] max-w-full self-start rounded-xl border border-[var(--c-card-border)] object-contain"
-                    />
-                )}
             </div>
 
+            {/* 编辑方案抽屉弹窗 */}
+            {editingProfile && (
+                <div className="modal-overlay modal-overlay-bottom">
+                    <div className="modal-sheet" data-ui="modal-sheet">
+                        <div className="modal-header" data-ui="modal-header">
+                            <button
+                                onClick={() => {
+                                    if (isNewProfile && editingId) removeProfile(editingId);
+                                    setIsNewProfile(false);
+                                    setEditingId(null);
+                                }}
+                                className="modal-header-btn modal-header-btn-muted"
+                            >
+                                <X size={18} />
+                            </button>
+                            <span className="modal-header-title">{isNewProfile ? "添加生图方案" : "编辑生图方案"}</span>
+                            <button
+                                onClick={() => {
+                                    setIsNewProfile(false);
+                                    setEditingId(null);
+                                }}
+                                className="modal-header-btn modal-header-btn-action"
+                            >
+                                <Check size={18} />
+                            </button>
+                        </div>
+
+                        <div className="modal-body hide-scrollbar flex flex-col gap-4 pb-10" data-ui="modal-body">
+                            <div className="flex flex-col gap-1">
+                                <label className="menu-desc ml-1">方案名称 (Name)</label>
+                                <Input
+                                    type="text"
+                                    value={editingProfile.name || ""}
+                                    onChange={(e) => updateProfile(editingProfile.id, { name: e.target.value })}
+                                    placeholder="例如: 快速生图 / 高清人像"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="menu-desc ml-1">请求方式</label>
+                                <Select
+                                    value={editingProfile.requestMode}
+                                    onChange={(event) => updateProfile(editingProfile.id, {
+                                        requestMode: event.target.value as ImageGenerationSettingsType["requestMode"],
+                                    })}
+                                >
+                                    <option value="direct">浏览器直连</option>
+                                    <option value="server">服务端转发</option>
+                                </Select>
+                                <span className="menu-desc ml-1">
+                                    浏览器直连直接从当前设备请求生图 API，可绕开部署平台函数超时；需要接口允许跨域。
+                                </span>
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="menu-desc ml-1">Base URL</label>
+                                <Input
+                                    type="url"
+                                    value={editingProfile.baseUrl}
+                                    onChange={(event) => updateProfile(editingProfile.id, { baseUrl: event.target.value })}
+                                    placeholder="https://api.openai.com/v1"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="menu-desc ml-1">API Key</label>
+                                <Input
+                                    type="password"
+                                    value={editingProfile.apiKey}
+                                    onChange={(event) => updateProfile(editingProfile.id, { apiKey: event.target.value })}
+                                    placeholder="sk-..."
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="menu-desc ml-1">模型名</label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Input
+                                            type="text"
+                                            value={editingProfile.model}
+                                            onChange={(event) => updateProfile(editingProfile.id, { model: event.target.value })}
+                                            placeholder="gpt-image-2 / dall-e-3 / flux-schnell"
+                                            className={(fetchedModels[editingProfile.id] || []).length > 0 ? "w-full pr-9" : "w-full"}
+                                        />
+                                        {(fetchedModels[editingProfile.id] || []).length > 0 && (
+                                            <>
+                                                <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-60" />
+                                                <select
+                                                    aria-label="选择拉取到的模型"
+                                                    value=""
+                                                    onChange={(event) => {
+                                                        if (event.target.value) updateProfile(editingProfile.id, { model: event.target.value });
+                                                    }}
+                                                    className="absolute inset-y-0 right-0 w-10 cursor-pointer opacity-0"
+                                                >
+                                                    <option value="">选择拉取到的模型...</option>
+                                                    {filterLikelyImageModels(fetchedModels[editingProfile.id]).map(model => (
+                                                        <option key={model} value={model}>{model}</option>
+                                                    ))}
+                                                </select>
+                                            </>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fetchModels(editingProfile)}
+                                        disabled={isFetchingModels[editingProfile.id]}
+                                        className="ui-btn ui-btn-soft-action shrink-0"
+                                    >
+                                        <RefreshCw size={16} className={isFetchingModels[editingProfile.id] ? "animate-spin" : ""} />
+                                        {isFetchingModels[editingProfile.id] ? "拉取中" : "拉取模型"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-1">
+                                    <label className="menu-desc ml-1">尺寸</label>
+                                    <Select
+                                        value={isCustomSize(editingProfile.size) ? "custom" : editingProfile.size}
+                                        onChange={(event) => selectSize(editingProfile, event.target.value)}
+                                    >
+                                        {SIZE_OPTIONS.map(option => (
+                                            <option key={option} value={option}>{option === "custom" ? "自定义…" : option}</option>
+                                        ))}
+                                    </Select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="menu-desc ml-1">质量</label>
+                                    <Select
+                                        value={editingProfile.quality}
+                                        onChange={(event) => updateProfile(editingProfile.id, { quality: event.target.value })}
+                                    >
+                                        {QUALITY_OPTIONS.map(option => <option key={option} value={option}>{option}</option>)}
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {isCustomSize(editingProfile.size) && (
+                                <div className="flex flex-col gap-1">
+                                    <label className="menu-desc ml-1">自定义分辨率（宽 × 高）</label>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={customW}
+                                            onChange={(event) => updateCustomSize(editingProfile, event.target.value, customH)}
+                                            placeholder="宽，如 2048"
+                                            className="flex-1"
+                                        />
+                                        <span className="menu-desc shrink-0">×</span>
+                                        <Input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={customH}
+                                            onChange={(event) => updateCustomSize(editingProfile, customW, event.target.value)}
+                                            placeholder="高，如 2048"
+                                            className="flex-1"
+                                        />
+                                        <span className="menu-desc shrink-0">px</span>
+                                    </div>
+                                    <span className="menu-desc ml-1 opacity-70">
+                                        以「宽x高」格式原样发给生图 API；宽高各填 2~5 位数字才生效。
+                                    </span>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col gap-1">
+                                <label className="menu-desc ml-1">补充提示词</label>
+                                <Textarea
+                                    value={editingProfile.extraPrompt}
+                                    onChange={(event) => updateProfile(editingProfile.id, { extraPrompt: event.target.value })}
+                                    placeholder="会和角色输出的图片描述一起发送给生图模型。"
+                                    rows={4}
+                                />
+                                <p className="menu-desc ml-1 opacity-70">
+                                    选择尺寸后会自动在末尾追加一句「{RATIO_HINT_MARKER}…」构图提示，用于纠正部分不认 size 参数的接口。可手动修改或删除。
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => testGeneration(editingProfile)}
+                                    disabled={isTesting[editingProfile.id]}
+                                    className="ui-btn ui-btn-success flex-1"
+                                >
+                                    <ImageIcon size={16} />
+                                    {isTesting[editingProfile.id] ? "测试中..." : "测试生图"}
+                                </button>
+                            </div>
+
+                            {status[editingProfile.id] && (
+                                <Alert variant={status[editingProfile.id]!.success ? "success" : "danger"}>
+                                    <AlertCircle size={16} className="mt-[2px] shrink-0" />
+                                    <span className="break-all leading-[1.5]">{status[editingProfile.id]!.message}</span>
+                                </Alert>
+                            )}
+                            {testPreviewUrl[editingProfile.id] && (
+                                <img
+                                    src={testPreviewUrl[editingProfile.id]!}
+                                    alt="测试生图结果"
+                                    className="max-h-[220px] max-w-full self-start rounded-xl border border-[var(--c-card-border)] object-contain"
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 删除确认对话框 */}
+            {confirmDeleteId && (
+                <ConfirmDialog
+                    title="确认删除？"
+                    message="删除生图方案后无法恢复。是否继续？"
+                    icon={AlertCircle}
+                    variant="danger"
+                    confirmLabel="确认删除"
+                    cancelLabel="取消"
+                    onConfirm={() => {
+                        removeProfile(confirmDeleteId);
+                        setConfirmDeleteId(null);
+                    }}
+                    onCancel={() => setConfirmDeleteId(null)}
+                />
+            )}
+
+            {/* 公共图床配置 */}
             <div className="flex flex-col gap-2">
                 <p className="settings-menu-section-title">Image Hosting</p>
                 <div className="menu-group">
@@ -549,6 +826,7 @@ export function ImageGenerationSettings() {
                 </div>
             </div>
 
+            {/* 公共角色参考图 */}
             <div className="flex flex-col gap-2">
                 <p className="settings-menu-section-title">Character References</p>
                 <div className="menu-group">
