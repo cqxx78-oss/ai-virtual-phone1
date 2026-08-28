@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { AlertCircle, Camera, ChevronDown, Image, RefreshCw, Search, Sparkles, Trash2, Upload } from "lucide-react";
+import { AlertCircle, Camera, ChevronDown, Image, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react";
 import type { ImageGenerationSettings as ImageGenerationSettingsType } from "@/lib/settings-types";
 import {
     DEFAULT_IMAGE_GENERATION_SETTINGS,
@@ -101,9 +101,6 @@ export function ImageGenerationSettings() {
     const [customW, setCustomW] = useState("2048");
     const [customH, setCustomH] = useState("2048");
     const lastCustomSize = useRef("2048x2048");
-    const [modelPickerOpen, setModelPickerOpen] = useState(false);
-    const [modelQuery, setModelQuery] = useState("");
-    const modelPickerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         // Sync the ratio hint to the saved size on load, so the hint is present
@@ -210,29 +207,8 @@ export function ImageGenerationSettings() {
 
     const likelyModels = useMemo(() => filterLikelyImageModels(models), [models]);
 
-    // 模型选择面板：按关键词实时过滤（大小写不敏感）
-    const visibleModels = useMemo(() => {
-        const keyword = modelQuery.trim().toLowerCase();
-        if (!keyword) return likelyModels;
-        return likelyModels.filter(model => model.toLowerCase().includes(keyword));
-    }, [likelyModels, modelQuery]);
-
-    // 点击面板外部时收起模型选择面板
-    useEffect(() => {
-        if (!modelPickerOpen) return;
-        const onPointerDown = (event: PointerEvent) => {
-            if (modelPickerRef.current && !modelPickerRef.current.contains(event.target as Node)) {
-                setModelPickerOpen(false);
-            }
-        };
-        document.addEventListener("pointerdown", onPointerDown);
-        return () => document.removeEventListener("pointerdown", onPointerDown);
-    }, [modelPickerOpen]);
-
     const fetchModels = async () => {
         setStatus(null);
-        setModelPickerOpen(false);
-        setModelQuery("");
         if (!settings.apiKey.trim() || !settings.baseUrl.trim()) {
             setStatus({ success: false, message: "请先填写 Base URL 和 API Key。" });
             return;
@@ -355,8 +331,8 @@ export function ImageGenerationSettings() {
                 <div className="flex flex-col gap-1">
                     <label className="menu-desc ml-1">模型名</label>
                     <div className="flex gap-2">
-                        {/* 单框合一:可手动输入;拉取到模型后右侧箭头展开可搜索的模型列表,点击回填 */}
-                        <div ref={modelPickerRef} className="relative flex-1">
+                        {/* 单框合一:可手动输入;拉取到模型后右侧出现下拉箭头,点开原生选择器选中即回填 */}
+                        <div className="relative flex-1">
                             <Input
                                 type="text"
                                 value={settings.model}
@@ -365,48 +341,20 @@ export function ImageGenerationSettings() {
                                 className={likelyModels.length > 0 ? "w-full pr-9" : "w-full"}
                             />
                             {likelyModels.length > 0 && (
-                                <button
-                                    type="button"
-                                    aria-label={modelPickerOpen ? "收起模型列表" : "展开模型列表"}
-                                    onClick={() => setModelPickerOpen(open => !open)}
-                                    className="absolute inset-y-0 right-0 flex w-9 cursor-pointer items-center justify-center text-[var(--c-icon)] hover:text-[var(--c-icon-active)]"
-                                >
-                                    <ChevronDown size={16} className={`transition-transform duration-200 ${modelPickerOpen ? "rotate-180" : ""}`} />
-                                </button>
-                            )}
-                            {modelPickerOpen && (
-                                <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-[var(--c-card-border)] bg-[var(--c-panel)] shadow-lg">
-                                    <div className="border-b border-[var(--c-card-border)] p-2">
-                                        <div className="relative">
-                                            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--c-icon)]" />
-                                            <Input
-                                                type="text"
-                                                value={modelQuery}
-                                                onChange={(event) => setModelQuery(event.target.value)}
-                                                placeholder="搜索模型…"
-                                                className="w-full pl-8 text-[13px]"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="max-h-56 overflow-y-auto p-1">
-                                        {visibleModels.length === 0 ? (
-                                            <span className="block px-2.5 py-2 text-[12px] text-[var(--c-text)]">没有匹配的模型</span>
-                                        ) : visibleModels.map(model => (
-                                            <button
-                                                key={model}
-                                                type="button"
-                                                onClick={() => {
-                                                    updateSettings({ model });
-                                                    setModelPickerOpen(false);
-                                                    setModelQuery("");
-                                                }}
-                                                className="block w-full truncate rounded-lg px-2.5 py-1.5 text-left text-[13px] text-[var(--c-text-title)] hover:bg-[var(--c-input)]"
-                                            >
-                                                {model}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                                <>
+                                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 opacity-60" />
+                                    <select
+                                        aria-label="选择拉取到的模型"
+                                        value=""
+                                        onChange={(event) => {
+                                            if (event.target.value) updateSettings({ model: event.target.value });
+                                        }}
+                                        className="absolute inset-y-0 right-0 w-10 cursor-pointer opacity-0"
+                                    >
+                                        <option value="">选择拉取到的模型...</option>
+                                        {likelyModels.map(model => <option key={model} value={model}>{model}</option>)}
+                                    </select>
+                                </>
                             )}
                         </div>
                         <button
@@ -419,9 +367,6 @@ export function ImageGenerationSettings() {
                             {isFetchingModels ? "拉取中" : "拉取模型"}
                         </button>
                     </div>
-                    {likelyModels.length > 0 && !modelPickerOpen && (
-                        <span className="menu-desc ml-1 opacity-70">已拉取 {likelyModels.length} 个模型，点右侧箭头展开列表可搜索选择。</span>
-                    )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
