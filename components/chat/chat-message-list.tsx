@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useSyncExternalStore } from "react";
 import { ChevronLeft } from "lucide-react";
-import { loadChatSessions, loadChatContacts, ChatSession, createOrGetSession, createGroupSession, pushChatMessage, addChatContact, loadChatMessages, getLastVisibleSessionMessage, getChatMessagePreview } from "@/lib/chat-storage";
+import { loadChatSessions, loadChatContacts, ChatSession, createOrGetSession, createGroupSession, pushChatMessage, addChatContact, loadChatMessages, getLastVisibleSessionMessage, getChatMessagePreview, CHAT_MESSAGE_PUSHED_EVENT } from "@/lib/chat-storage";
 import { loadCharacters } from "@/lib/character-storage";
 import { Character } from "@/lib/character-types";
 import { resolveUserIdentity } from "@/lib/settings-storage";
@@ -106,9 +106,11 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
         const refreshSessions = () => setSessions(loadChatSessions());
         window.addEventListener("weixin-messages-updated", refreshSessions);
         window.addEventListener("chat-messages-updated", refreshSessions);
+        window.addEventListener(CHAT_MESSAGE_PUSHED_EVENT, refreshSessions);
         return () => {
             window.removeEventListener("weixin-messages-updated", refreshSessions);
             window.removeEventListener("chat-messages-updated", refreshSessions);
+            window.removeEventListener(CHAT_MESSAGE_PUSHED_EVENT, refreshSessions);
         };
     }, []);
 
