@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useContext } from "react";
-import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Trash2, X, Check } from "lucide-react";
+import { useState, useEffect, useCallback, useContext, useMemo } from "react";
+import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check } from "lucide-react";
 import { SettingsContext } from "../phone-settings-app";
 import type { ApiConfig } from "@/lib/settings-types";
 import { loadApiConfigs, removeApiConfigReferences, saveApiConfigs } from "@/lib/settings-storage";
@@ -42,6 +42,7 @@ export function ApiSettings() {
     // Testing and Fetching states
     const [isFetching, setIsFetching] = useState<Record<string, boolean>>({});
     const [fetchedModels, setFetchedModels] = useState<Record<string, string[]>>({});
+    const [modelQuery, setModelQuery] = useState<Record<string, string>>({});
     const [isTesting, setIsTesting] = useState<Record<string, boolean>>({});
     const [testResult, setTestResult] = useState<Record<string, { success: boolean; message: string }>>({});
 
@@ -103,10 +104,24 @@ export function ApiSettings() {
         delete newFetchedModels[id];
         setFetchedModels(newFetchedModels);
 
+        const newModelQuery = { ...modelQuery };
+        delete newModelQuery[id];
+        setModelQuery(newModelQuery);
+
         const newTestResults = { ...testResult };
         delete newTestResults[id];
         setTestResult(newTestResults);
     };
+
+    // 模型下拉搜索：按关键词实时过滤已拉取模型（大小写不敏感）
+    const filteredModels = useMemo(() => {
+        const result: Record<string, string[]> = {};
+        for (const [id, list] of Object.entries(fetchedModels)) {
+            const keyword = (modelQuery[id] || "").trim().toLowerCase();
+            result[id] = keyword ? list.filter(model => model.toLowerCase().includes(keyword)) : list;
+        }
+        return result;
+    }, [fetchedModels, modelQuery]);
 
     // Use unified determineBaseUrl from api-helpers
 
@@ -152,6 +167,7 @@ export function ApiSettings() {
                 throw new Error("返回数据格式不符合预期");
             }
             setFetchedModels(prev => ({ ...prev, [config.id]: modelNames }));
+            setModelQuery(prev => ({ ...prev, [config.id]: "" }));
             setTestResult(prev => ({ ...prev, [config.id]: { success: true, message: `成功获取 ${modelNames.length} 个模型` } }));
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -362,19 +378,30 @@ export function ApiSettings() {
 
                                         <div className="flex flex-col gap-1">
                                             <label className="menu-desc ml-1">默认模型 (Default Model)</label>
-                                            <div className="flex gap-2">
-                                                {fetchedModels[config.id] && fetchedModels[config.id].length > 0 ? (
+                                            {fetchedModels[config.id] && fetchedModels[config.id].length > 0 ? (
+                                                <div className="flex flex-col gap-1.5">
+                                                    <div className="relative">
+                                                        <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--c-icon)]" />
+                                                        <input
+                                                            type="text"
+                                                            value={modelQuery[config.id] || ""}
+                                                            onChange={(e) => setModelQuery(prev => ({ ...prev, [config.id]: e.target.value }))}
+                                                            placeholder="搜索已拉取的模型…"
+                                                            className="ui-input w-full pl-8"
+                                                        />
+                                                    </div>
                                                     <select
                                                         value={config.defaultModel}
                                                         onChange={(e) => updateConfig(config.id, { defaultModel: e.target.value })}
                                                         className="ui-select flex-1"
                                                     >
                                                         <option value="">请选择模型...</option>
-                                                        {fetchedModels[config.id].map(m => (
+                                                        {filteredModels[config.id].map(m => (
                                                             <option key={m} value={m}>{m}</option>
                                                         ))}
                                                     </select>
-                                                ) : (
+                                                </div>
+                                            ) : (
                                                     <input
                                                         type="text"
                                                         value={config.defaultModel}
