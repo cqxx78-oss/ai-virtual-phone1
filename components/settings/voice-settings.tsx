@@ -551,7 +551,9 @@ export function VoiceSettings() {
                 if (!response.ok) {
                     throw new Error(data.message || data.error || `同步失败 (${response.status})`);
                 }
-                const clonedVoices = Array.isArray(data.voices) ? data.voices as VoiceOption[] : [];
+                const clonedVoices = Array.isArray(data.voices) 
+                    ? (data.voices as VoiceOption[]).map(v => ({ ...v, category: "official" })) 
+                    : [];
                 const nextCustomVoices = uniqueOptions([...clonedVoices, ...(config.customVoices || [])]);
                 updateConfig(config.id, { customVoices: nextCustomVoices });
                 setFetchedVoices(prev => ({ ...prev, [config.id]: nextCustomVoices }));
@@ -1065,21 +1067,10 @@ export function VoiceSettings() {
                 const isCantoneseVoice = (v: VoiceOption) => v.id.startsWith("Cantonese_") || v.name.includes("粤语");
                 const hasChinese = (v: VoiceOption) => /[\u4e00-\u9fa5]/.test(v.name) || /[\u4e00-\u9fa5]/.test(v.id) || v.id.startsWith("male-") || v.id.startsWith("female-") || v.id.startsWith("Chinese");
 
-                // 真正的克隆/文生必须是明确标记为 cloning/generation 或属于用户自己上传的自定义音色，且排除已被明确识别为普通话/粤语系统音色项
-                const isRealClonedOrGen = (v: VoiceOption) => {
-                    if (targetConfig.customVoices?.some(cv => cv.id === v.id)) return true;
-                    if (v.category === "cloning" || v.category === "generation") return true;
-                    if (v.id.startsWith("ttv-")) return true;
-                    if (v.id.startsWith("voice_") && !hasChinese(v) && !isCantoneseVoice(v)) return true;
-                    return false;
-                };
-
-                const cantoneseVoices = isMinimax ? options.filter(v => isCantoneseVoice(v)) : [];
-                const customOrGenVoices = isMinimax ? options.filter(v => isRealClonedOrGen(v) && !cantoneseVoices.includes(v)) : [];
-                // 只要带有中文或属于标准中文音色编码，一律分入「普通话」
-                const mandarinVoices = isMinimax ? options.filter(v => !cantoneseVoices.includes(v) && !customOrGenVoices.includes(v) && hasChinese(v)) : options;
-                // 剩下的纯英文/非中文外语音色，一律归入「英语/外语」
-                const englishVoices = isMinimax ? options.filter(v => !cantoneseVoices.includes(v) && !customOrGenVoices.includes(v) && !mandarinVoices.includes(v)) : [];
+                const officialVoices = isMinimax ? options.filter(v => v.category === "official") : [];
+                const cantoneseVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && isCantoneseVoice(v)) : [];
+                const mandarinVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && !cantoneseVoices.includes(v) && hasChinese(v)) : options;
+                const foreignVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && !cantoneseVoices.includes(v) && !mandarinVoices.includes(v)) : [];
 
                 const renderVoiceItem = (v: VoiceOption) => {
                     const isFav = favoriteVoices.includes(v.id);
@@ -1147,8 +1138,8 @@ export function VoiceSettings() {
                                         { id: "fav", label: "收藏" },
                                         { id: "mandarin", label: "普通话" },
                                         { id: "cantonese", label: "粤语" },
-                                        { id: "foreign", label: "英语/外语" },
-                                        { id: "custom", label: "克隆/文生" },
+                                        { id: "foreign", label: "外语" },
+                                        ...(officialVoices.length > 0 ? [{ id: "official", label: "官方" }] : []),
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
@@ -1203,19 +1194,19 @@ export function VoiceSettings() {
                                                 </div>
                                             </div>
                                         )}
-                                        {activeCategoryTab === "foreign" && englishVoices.length > 0 && (
+                                        {activeCategoryTab === "foreign" && foreignVoices.length > 0 && (
                                             <div className="space-y-1.5">
-                                                <div className="text-xs font-bold text-gray-500 px-1">🌐 英语及其他语言音色</div>
+                                                <div className="text-xs font-bold text-gray-500 px-1">🌐 外语音色</div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
-                                                    {englishVoices.map(renderVoiceItem)}
+                                                    {foreignVoices.map(renderVoiceItem)}
                                                 </div>
                                             </div>
                                         )}
-                                        {activeCategoryTab === "custom" && customOrGenVoices.length > 0 && (
+                                        {activeCategoryTab === "official" && officialVoices.length > 0 && (
                                             <div className="space-y-1.5">
-                                                <div className="text-xs font-bold text-gray-500 px-1">🎙️ 我的克隆 / 文生音色</div>
+                                                <div className="text-xs font-bold text-gray-500 px-1">🎙️ 官方接口获取音色</div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
-                                                    {customOrGenVoices.map(renderVoiceItem)}
+                                                    {officialVoices.map(renderVoiceItem)}
                                                 </div>
                                             </div>
                                         )}
