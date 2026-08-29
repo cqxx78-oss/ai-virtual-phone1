@@ -119,8 +119,74 @@ function isEffectivelyEmptyJson(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
-  if (isRecord(value)) return Object.values(value).every(isEffectivelyEmptyJson);
+  if (isRecord(value)) {
+    // 对于带有 enabled/apiKey/profiles 等设置对象，若 apiKey/profiles 等核心字段为空，视为未配置状态
+    if ("apiKey" in value && typeof value.apiKey === "string" && !value.apiKey.trim()) {
+      const profiles = Array.isArray(value.profiles) ? value.profiles : [];
+      const hasConfiguredProfile = profiles.some(p => p && typeof p === "object" && typeof (p as Record<string, unknown>).apiKey === "string" && ((p as Record<string, unknown>).apiKey as string).trim());
+      if (!hasConfiguredProfile) return true;
+    }
+    return Object.values(value).every(isEffectivelyEmptyJson);
+  }
   return false;
+}
+
+function tryMergeJsonObject(key: string, existingRaw: string, incomingRaw: string): string | null {
+  let existing: unknown;
+  let incoming: unknown;
+  try {
+    existing = JSON.parse(existingRaw);
+    incoming = JSON.parse(incomingRaw);
+  } catch {
+    return null;
+  }
+
+  if (!isRecord(existing) || !isRecord(incoming)) return null;
+
+  // 如果现存内容实质为空，直接采纳导入的内容
+  if (isEffectivelyEmptyJson(existing) && !isEffectivelyEmptyJson(incoming)) {
+    return incomingRaw;
+  }
+
+  // 针对生图配置等关键设置对象的深度合并
+  if (key === "ai_phone_image_generation_settings_v1") {
+    const incomingProfiles = Array.isArray(incoming.profiles) ? incoming.profiles : [];
+    const existingProfiles = Array.isArray(existing.profiles) ? existing.profiles : [];
+    const mergedProfiles = [...existingProfiles];
+    for (const p of incomingProfiles) {
+      if (p && typeof p === "object" && (p as Record<string, unknown>).id) {
+        const idx = mergedProfiles.findIndex(ep => ep && typeof ep === "object" && (ep as Record<string, unknown>).id === (p as Record<string, unknown>).id);
+        if (idx >= 0) mergedProfiles[idx] = p;
+        else mergedProfiles.push(p);
+      }
+    }
+    const mergedObj = {
+      ...existing,
+      ...incoming,
+      profiles: mergedProfiles.length > 0 ? mergedProfiles : (incomingProfiles.length > 0 ? incomingProfiles : existingProfiles),
+      characterReferences: {
+        ...(isRecord(existing.characterReferences) ? existing.characterReferences : {}),
+        ...(isRecord(incoming.characterReferences) ? incoming.characterReferences : {}),
+      },
+      imageHosting: {
+        ...(isRecord(existing.imageHosting) ? existing.imageHosting : {}),
+        ...(isRecord(incoming.imageHosting) ? incoming.imageHosting : {}),
+      },
+    };
+    return JSON.stringify(mergedObj);
+  }
+
+  // 针对主题配置（包含桌面壁纸、自选壁纸列表、小组件布局等）
+  if (key === "ai_phone_theme_profile_v1") {
+    return JSON.stringify({ ...existing, ...incoming });
+  }
+
+  // 针对小卷设置（包含头像、昵称等）
+  if (key === "ai_phone_mascot_settings_v1") {
+    return JSON.stringify({ ...existing, ...incoming });
+  }
+
+  return null;
 }
 
 function tryReplaceEmptyJsonValue(existingRaw: string, incomingRaw: string): string | null {
@@ -563,6 +629,7 @@ export async function importSource(
           continue;
         }
         const merged = tryMergeJsonArrayByKey(existing, incoming)
+          ?? tryMergeJsonObject(record.key, existing, incoming)
           ?? tryReplaceEmptyJsonValue(existing, incoming);
         if (!merged) {
           result.skipped += 1;
