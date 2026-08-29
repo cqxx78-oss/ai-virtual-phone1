@@ -1161,9 +1161,12 @@ export function VoiceSettings() {
                                 {/* 常用收藏分组 */}
                                 {activeCategoryTab === "fav" && (
                                     <div className="space-y-1.5">
-                                        <div className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 px-1">
-                                            <Star size={13} className="fill-amber-500 text-amber-500" />
-                                            <span>我的收藏</span>
+                                        <div className="flex items-center justify-between px-1">
+                                            <div className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                                <Star size={13} className="fill-amber-500 text-amber-500" />
+                                                <span>我的收藏</span>
+                                            </div>
+                                            <span className="text-xs text-gray-400">{favorites.length} 个</span>
                                         </div>
                                         {favorites.length > 0 ? (
                                             <div className="bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl p-1 space-y-0.5 border border-amber-500/20">
@@ -1180,7 +1183,10 @@ export function VoiceSettings() {
                                     <>
                                         {activeCategoryTab === "mandarin" && mandarinVoices.length > 0 && (
                                             <div className="space-y-1.5">
-                                                <div className="text-xs font-bold text-gray-500 px-1">🗣️ 普通话系统音色</div>
+                                                <div className="flex items-center justify-between px-1">
+                                                    <div className="text-xs font-bold text-gray-500">🗣️ 普通话系统音色</div>
+                                                    <span className="text-xs text-gray-400">{mandarinVoices.length} 个</span>
+                                                </div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                                                     {mandarinVoices.map(renderVoiceItem)}
                                                 </div>
@@ -1188,7 +1194,10 @@ export function VoiceSettings() {
                                         )}
                                         {activeCategoryTab === "cantonese" && cantoneseVoices.length > 0 && (
                                             <div className="space-y-1.5">
-                                                <div className="text-xs font-bold text-gray-500 px-1">🇭🇰 粤语方言音色</div>
+                                                <div className="flex items-center justify-between px-1">
+                                                    <div className="text-xs font-bold text-gray-500">🇭🇰 粤语方言音色</div>
+                                                    <span className="text-xs text-gray-400">{cantoneseVoices.length} 个</span>
+                                                </div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                                                     {cantoneseVoices.map(renderVoiceItem)}
                                                 </div>
@@ -1196,7 +1205,10 @@ export function VoiceSettings() {
                                         )}
                                         {activeCategoryTab === "foreign" && foreignVoices.length > 0 && (
                                             <div className="space-y-1.5">
-                                                <div className="text-xs font-bold text-gray-500 px-1">🌐 外语音色</div>
+                                                <div className="flex items-center justify-between px-1">
+                                                    <div className="text-xs font-bold text-gray-500">🌐 外语音色</div>
+                                                    <span className="text-xs text-gray-400">{foreignVoices.length} 个</span>
+                                                </div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                                                     {foreignVoices.map(renderVoiceItem)}
                                                 </div>
@@ -1204,7 +1216,10 @@ export function VoiceSettings() {
                                         )}
                                         {activeCategoryTab === "official" && officialVoices.length > 0 && (
                                             <div className="space-y-1.5">
-                                                <div className="text-xs font-bold text-gray-500 px-1">🎙️ 官方接口获取音色</div>
+                                                <div className="flex items-center justify-between px-1">
+                                                    <div className="text-xs font-bold text-gray-500">🎙️ 官方接口获取音色</div>
+                                                    <span className="text-xs text-gray-400">{officialVoices.length} 个</span>
+                                                </div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                                                     {officialVoices.map(renderVoiceItem)}
                                                 </div>
