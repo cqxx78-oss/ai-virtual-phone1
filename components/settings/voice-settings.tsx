@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useContext } from "react";
-import { Plus, Play, Pause, AlertCircle, RefreshCw, FileEdit, Trash2, X, Check, Upload, List } from "lucide-react";
+import { Plus, Play, Pause, AlertCircle, RefreshCw, FileEdit, Trash2, X, Check, Upload, List, Star } from "lucide-react";
 import { SettingsContext } from "../phone-settings-app";
 import type { VoiceApiConfig } from "@/lib/settings-types";
 import { loadVoiceConfigs, saveVoiceConfigs } from "@/lib/settings-storage";
@@ -240,7 +240,27 @@ export function VoiceSettings() {
     const [manualModelIds, setManualModelIds] = useState<Record<string, boolean>>({});
     const [manualVoiceIds, setManualVoiceIds] = useState<Record<string, boolean>>({});
     const [isLoaded, setIsLoaded] = useState(false);
+    const [voicePickerTargetId, setVoicePickerTargetId] = useState<string | null>(null);
+    const [favoriteVoices, setFavoriteVoices] = useState<string[]>(() => {
+        if (typeof window === "undefined") return [];
+        try {
+            const raw = localStorage.getItem("favorite_voices_cache");
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    });
     const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    const toggleFavoriteVoice = useCallback((voiceId: string) => {
+        setFavoriteVoices(prev => {
+            const next = prev.includes(voiceId) ? prev.filter(id => id !== voiceId) : [...prev, voiceId];
+            try {
+                localStorage.setItem("favorite_voices_cache", JSON.stringify(next));
+            } catch { /* ignore */ }
+            return next;
+        });
+    }, []);
 
     // Fetching states for Voices
     const [isFetching, setIsFetching] = useState<Record<string, boolean>>({});
@@ -858,8 +878,8 @@ export function VoiceSettings() {
                                                                 type="button"
                                                                 onClick={() => setManualVoiceIds(prev => ({ ...prev, [config.id]: false }))}
                                                                 className="ui-icon-btn"
-                                                                aria-label="返回音色下拉选择"
-                                                                title="返回音色下拉选择"
+                                                                aria-label="打开音色选择面板"
+                                                                title="打开音色选择面板"
                                                             >
                                                                 <List size={20} />
                                                             </button>
@@ -867,23 +887,17 @@ export function VoiceSettings() {
                                                     ) : (
                                                         (() => {
                                                             const options = voiceOptionsForConfig(config, fetchedVoices);
+                                                            const currentOpt = options.find(v => v.id === config.defaultVoice);
+                                                            const displayName = currentOpt ? currentOpt.name : (config.defaultVoice || "请选择音色");
                                                             return (
-                                                                <select
-                                                                    value={options.some(v => v.id === config.defaultVoice) ? config.defaultVoice : "__manual__"}
-                                                                    onChange={(e) => {
-                                                                        if (e.target.value === "__manual__") {
-                                                                            setManualVoiceIds(prev => ({ ...prev, [config.id]: true }));
-                                                                            return;
-                                                                        }
-                                                                        updateConfig(config.id, { defaultVoice: e.target.value });
-                                                                    }}
-                                                                    className="ui-select flex-1"
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setVoicePickerTargetId(config.id)}
+                                                                    className="ui-select flex-1 text-left flex items-center justify-between truncate"
                                                                 >
-                                                                    {options.map(v => (
-                                                                        <option key={v.id} value={v.id}>{v.name}</option>
-                                                                    ))}
-                                                                    <option value="__manual__">手动输入...</option>
-                                                                </select>
+                                                                    <span className="truncate">{displayName}</span>
+                                                                    <span className="text-xs opacity-60 ml-2">切换</span>
+                                                                </button>
                                                             );
                                                         })()
                                                     )}
@@ -994,6 +1008,147 @@ export function VoiceSettings() {
                                         {isCloning ? "正在克隆..." : "开始克隆并写入 Voice ID"}
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {voicePickerTargetId && (() => {
+                const targetConfig = configs.find(c => c.id === voicePickerTargetId);
+                if (!targetConfig) return null;
+                const options = voiceOptionsForConfig(targetConfig, fetchedVoices);
+
+                const isMinimax = targetConfig.provider === "Minimax";
+                const favorites = options.filter(v => favoriteVoices.includes(v.id));
+
+                // Grouping for Minimax
+                const cantoneseVoices = isMinimax ? options.filter(v => v.id.startsWith("Cantonese_") || v.name.includes("粤语")) : [];
+                const englishVoices = isMinimax ? options.filter(v => /^[A-Za-z]/.test(v.id) && !v.id.startsWith("male-") && !v.id.startsWith("female-") && !v.id.startsWith("Cantonese_") && !v.id.startsWith("Chinese")) : [];
+                const mandarinVoices = isMinimax ? options.filter(v => !cantoneseVoices.includes(v) && !englishVoices.includes(v) && !v.id.startsWith("voice_") && !v.id.startsWith("ttv-")) : options;
+                const customOrGenVoices = isMinimax ? options.filter(v => v.id.startsWith("voice_") || v.id.startsWith("ttv-") || targetConfig.customVoices?.some(cv => cv.id === v.id)) : [];
+
+                const renderVoiceItem = (v: VoiceOption) => {
+                    const isFav = favoriteVoices.includes(v.id);
+                    const isSelected = targetConfig.defaultVoice === v.id;
+                    return (
+                        <div
+                            key={v.id}
+                            onClick={() => {
+                                updateConfig(targetConfig.id, { defaultVoice: v.id });
+                                setVoicePickerTargetId(null);
+                            }}
+                            className={`flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
+                                isSelected ? "bg-black/10 dark:bg-white/10 font-semibold" : "hover:bg-black/5 dark:hover:bg-white/5"
+                            }`}
+                        >
+                            <div className="flex flex-col min-w-0 pr-2">
+                                <span className="text-xs md:text-sm truncate">{v.name}</span>
+                                <span className="text-[10px] text-gray-400 truncate">{v.id}</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFavoriteVoice(v.id);
+                                }}
+                                className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-amber-500 transition-colors"
+                                title={isFav ? "取消收藏" : "收藏音色"}
+                            >
+                                <Star
+                                    size={16}
+                                    className={isFav ? "fill-amber-400 text-amber-500" : "text-gray-400"}
+                                />
+                            </button>
+                        </div>
+                    );
+                };
+
+                return (
+                    <div className="modal-backdrop" data-ui="modal-backdrop" onClick={() => setVoicePickerTargetId(null)}>
+                        <div
+                            className="modal-panel max-w-lg max-h-[85vh] flex flex-col"
+                            data-ui="modal-panel"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="modal-header" data-ui="modal-header">
+                                <h3 className="modal-title">选择音色</h3>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setManualVoiceIds(prev => ({ ...prev, [targetConfig.id]: true }));
+                                            setVoicePickerTargetId(null);
+                                        }}
+                                        className="text-xs px-2.5 py-1 rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5"
+                                    >
+                                        手动填 ID
+                                    </button>
+                                    <button onClick={() => setVoicePickerTargetId(null)} className="modal-header-btn"><X size={18} /></button>
+                                </div>
+                            </div>
+
+                            <div className="modal-body flex-1 overflow-y-auto hide-scrollbar space-y-4 p-4" data-ui="modal-body">
+                                {/* 常用收藏分组 - 固定置顶 */}
+                                <div className="space-y-1.5">
+                                    <div className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 px-1">
+                                        <Star size={13} className="fill-amber-500 text-amber-500" />
+                                        <span>我的收藏</span>
+                                    </div>
+                                    {favorites.length > 0 ? (
+                                        <div className="bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl p-1 space-y-0.5 border border-amber-500/20">
+                                            {favorites.map(renderVoiceItem)}
+                                        </div>
+                                    ) : (
+                                        <div className="text-xs text-gray-400 italic px-3 py-2 bg-black/5 dark:bg-white/5 rounded-xl text-center">
+                                            暂无收藏音色（点击右侧星星即可收藏）
+                                        </div>
+                                    )}
+                                </div>
+
+                                {isMinimax ? (
+                                    <>
+                                        {mandarinVoices.length > 0 && (
+                                            <div className="space-y-1.5">
+                                                <div className="text-xs font-bold text-gray-500 px-1">🗣️ 普通话系统音色</div>
+                                                <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
+                                                    {mandarinVoices.map(renderVoiceItem)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {cantoneseVoices.length > 0 && (
+                                            <div className="space-y-1.5">
+                                                <div className="text-xs font-bold text-gray-500 px-1">🇭🇰 粤语方言音色</div>
+                                                <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
+                                                    {cantoneseVoices.map(renderVoiceItem)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {englishVoices.length > 0 && (
+                                            <div className="space-y-1.5">
+                                                <div className="text-xs font-bold text-gray-500 px-1">🌐 英语及其他语言音色</div>
+                                                <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
+                                                    {englishVoices.map(renderVoiceItem)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {customOrGenVoices.length > 0 && (
+                                            <div className="space-y-1.5">
+                                                <div className="text-xs font-bold text-gray-500 px-1">🎙️ 我的克隆 / 文生音色</div>
+                                                <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
+                                                    {customOrGenVoices.map(renderVoiceItem)}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        <div className="text-xs font-bold text-gray-500 px-1">全部可用音色</div>
+                                        <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
+                                            {options.map(renderVoiceItem)}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
