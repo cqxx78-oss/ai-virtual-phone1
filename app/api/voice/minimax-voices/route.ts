@@ -62,7 +62,7 @@ function extractAllVoices(payload: unknown): { id: string; name: string; created
     const result: { id: string; name: string; createdAt?: number }[] = [];
     const seen = new Set<string>();
 
-    const appendItems = (list: unknown[], defaultPrefix: string) => {
+    const appendItems = (list: unknown[], defaultPrefix: string, rawCategory: "system" | "cloning" | "generation") => {
         for (const item of list) {
             const record = getRecord(item);
             const rawVoiceId = record.voice_id ?? record.voiceId ?? record.id;
@@ -70,17 +70,22 @@ function extractAllVoices(payload: unknown): { id: string; name: string; created
             const voiceId = rawVoiceId.trim();
             if (seen.has(voiceId)) continue;
             seen.add(voiceId);
+            const formattedName = formatVoiceName(record, voiceId, defaultPrefix);
+            // 精准重分类：凡是系统音色或带有中文、标准英文ID的，一律纠正为 system；仅非官方的真正克隆音色保留 cloning/generation
+            const isOfficial = rawCategory === "system" || voiceId.startsWith("male-") || voiceId.startsWith("female-") || voiceId.startsWith("Chinese") || voiceId.startsWith("Cantonese_") || /[\u4e00-\u9fa5]/.test(formattedName);
+            const category = isOfficial ? "system" : rawCategory;
             result.push({
                 id: voiceId,
-                name: formatVoiceName(record, voiceId, defaultPrefix),
+                name: formattedName,
+                category,
                 createdAt: parseCreatedTime(record.created_time),
             });
         }
     };
 
-    appendItems(systemVoices, "系统音色");
-    appendItems(clonedVoices, "克隆音色");
-    appendItems(genVoices, "生成音色");
+    appendItems(systemVoices, "系统音色", "system");
+    appendItems(clonedVoices, "克隆音色", "cloning");
+    appendItems(genVoices, "生成音色", "generation");
 
     return result;
 }
