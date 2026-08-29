@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { ChatMessageList } from "./chat-message-list";
 import { ChatContactsList } from "./chat-contacts-list";
 import { MomentsFeed } from "./moments-feed";
@@ -200,6 +200,37 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         setActiveTab("messages");
     };
 
+    const historyPushedRef = useRef(false);
+
+    useEffect(() => {
+        const isRoomOpen = !!activeSession || activeMascot;
+        if (isRoomOpen && !historyPushedRef.current) {
+            window.history.pushState({ chatRoomOpen: true }, "");
+            historyPushedRef.current = true;
+        }
+    }, [activeSession, activeMascot]);
+
+    useEffect(() => {
+        const handlePopState = () => {
+            if (historyPushedRef.current) {
+                historyPushedRef.current = false;
+                setActiveSession(null);
+                setActiveMascot(false);
+            }
+        };
+        window.addEventListener("popstate", handlePopState);
+        return () => window.removeEventListener("popstate", handlePopState);
+    }, []);
+
+    const handleRoomBack = useCallback(() => {
+        if (historyPushedRef.current) {
+            window.history.back();
+        } else {
+            setActiveSession(null);
+            setActiveMascot(false);
+        }
+    }, []);
+
     // Listen for CSS updates from settings panel
     useEffect(() => {
         const onCSSUpdate = () => setChatAppCSS(kvGet("chat-app-custom-css") || "");
@@ -285,14 +316,14 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
             {/* Chat Rooms — all visited sessions stay mounted, only active one is visible */}
             {[...visitedSessions.values()].map(sess => (
                 <div key={sess.id} style={{ display: activeSession?.id === sess.id ? undefined : 'none' }} className="chat-room-layer absolute inset-0">
-                    <ChatRoom session={sess} onBack={() => setActiveSession(null)} />
+                    <ChatRoom session={sess} onBack={handleRoomBack} />
                 </div>
             ))}
             {activeMascot && (
                 <div className="chat-room-layer absolute inset-0">
                     <MascotChatRoom
-                        onBack={() => setActiveMascot(false)}
-                        onDeleted={() => setActiveMascot(false)}
+                        onBack={handleRoomBack}
+                        onDeleted={handleRoomBack}
                     />
                 </div>
             )}
