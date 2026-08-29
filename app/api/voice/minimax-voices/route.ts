@@ -25,32 +25,64 @@ function baseRespError(payload: unknown): string | null {
     return null;
 }
 
-function voiceName(item: Record<string, unknown>, voiceId: string): string {
-    const description = typeof item.description === "string" ? item.description.trim() : "";
-    return description || `克隆音色 (${voiceId})`;
+function formatVoiceName(item: Record<string, unknown>, voiceId: string, defaultPrefix = "音色"): string {
+    const voiceName = typeof item.voice_name === "string" ? item.voice_name.trim() : "";
+    if (voiceName) {
+        return `${voiceName} (${voiceId})`;
+    }
+    const desc = Array.isArray(item.description)
+        ? item.description.filter(Boolean).join(" ").trim()
+        : (typeof item.description === "string" ? item.description.trim() : "");
+    if (desc) {
+        return `${desc.slice(0, 30)} (${voiceId})`;
+    }
+    return `${defaultPrefix} (${voiceId})`;
 }
 
-function extractVoiceCloning(payload: unknown): { id: string; name: string; createdAt?: number }[] {
+function parseCreatedTime(value: unknown): number | undefined {
+    if (typeof value === "number") return value;
+    if (typeof value === "string" && value.trim()) {
+        const parsed = Date.parse(value);
+        if (!Number.isNaN(parsed)) return parsed;
+    }
+    return undefined;
+}
+
+function extractAllVoices(payload: unknown): { id: string; name: string; createdAt?: number }[] {
     const root = getRecord(payload);
     const data = getRecord(root.data);
-    let source: unknown[] = [];
-    if (Array.isArray(root.voice_cloning)) {
-        source = root.voice_cloning;
-    } else if (Array.isArray(data.voice_cloning)) {
-        source = data.voice_cloning;
-    }
 
-    return source.flatMap(item => {
-        const record = getRecord(item);
-        const rawVoiceId = record.voice_id ?? record.voiceId ?? record.id;
-        if (typeof rawVoiceId !== "string" || !rawVoiceId.trim()) return [];
-        const createdTime = record.created_time;
-        return [{
-            id: rawVoiceId.trim(),
-            name: voiceName(record, rawVoiceId.trim()),
-            createdAt: typeof createdTime === "number" ? createdTime : undefined,
-        }];
-    });
+    const systemVoices = Array.isArray(root.system_voice) ? root.system_voice
+        : Array.isArray(data.system_voice) ? data.system_voice : [];
+    const clonedVoices = Array.isArray(root.voice_cloning) ? root.voice_cloning
+        : Array.isArray(data.voice_cloning) ? data.voice_cloning : [];
+    const genVoices = Array.isArray(root.voice_generation) ? root.voice_generation
+        : Array.isArray(data.voice_generation) ? data.voice_generation : [];
+
+    const result: { id: string; name: string; createdAt?: number }[] = [];
+    const seen = new Set<string>();
+
+    const appendItems = (list: unknown[], defaultPrefix: string) => {
+        for (const item of list) {
+            const record = getRecord(item);
+            const rawVoiceId = record.voice_id ?? record.voiceId ?? record.id;
+            if (typeof rawVoiceId !== "string" || !rawVoiceId.trim()) continue;
+            const voiceId = rawVoiceId.trim();
+            if (seen.has(voiceId)) continue;
+            seen.add(voiceId);
+            result.push({
+                id: voiceId,
+                name: formatVoiceName(record, voiceId, defaultPrefix),
+                createdAt: parseCreatedTime(record.created_time),
+            });
+        }
+    };
+
+    appendItems(systemVoices, "系统音色");
+    appendItems(clonedVoices, "克隆音色");
+    appendItems(genVoices, "生成音色");
+
+    return result;
 }
 
 export async function POST(request: Request) {
@@ -75,7 +107,7 @@ async function handleGetVoices(request: Request) {
             Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ voice_type: "voice_cloning" }),
+        body: JSON.stringify({ voice_type: "all" }),
     });
 
     const text = await response.text();
@@ -94,5 +126,5 @@ async function handleGetVoices(request: Request) {
         );
     }
 
-    return NextResponse.json({ ok: true, voices: extractVoiceCloning(data) });
+    return NextResponse.json({ ok: true, voices: extractAllVoices(data) });
 }
