@@ -1110,9 +1110,28 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   );
   const [savedTheme, setSavedTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
   const [draftTheme, setDraftTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
+  const appHistoryPushedRef = useRef(false);
+
   useEffect(() => {
     activeAppRef.current = activeApp;
+    if (activeApp && !appHistoryPushedRef.current) {
+      window.history.pushState({ appOpen: true, appId: activeApp }, "");
+      appHistoryPushedRef.current = true;
+    } else if (!activeApp && appHistoryPushedRef.current) {
+      appHistoryPushedRef.current = false;
+    }
   }, [activeApp]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (appHistoryPushedRef.current) {
+        appHistoryPushedRef.current = false;
+        setActiveApp(null);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
   // Listen for theme CSS updates from 小卷
   useEffect(() => {
     const onThemeUpdate = () => {
