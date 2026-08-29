@@ -1946,6 +1946,11 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
 
             if (pending.length === 0) {
                 el.scrollTop = el.scrollHeight;
+                if (typeof window !== "undefined" && window.requestAnimationFrame) {
+                    window.requestAnimationFrame(() => {
+                        el.scrollTop = el.scrollHeight;
+                    });
+                }
                 console.log(`[SCROLL] done (no pending), sH=${el.scrollHeight}`);
             } else {
                 let loaded = 0;
@@ -1954,6 +1959,11 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                     if (loaded >= pending.length) {
                         if (initialScrollVersionRef.current !== scrollVersion || loadingMoreRef.current) return;
                         el.scrollTop = el.scrollHeight;
+                        if (typeof window !== "undefined" && window.requestAnimationFrame) {
+                            window.requestAnimationFrame(() => {
+                                el.scrollTop = el.scrollHeight;
+                            });
+                        }
                         console.log(`[SCROLL] done (all loaded), sH=${el.scrollHeight}`);
                     }
                 };
