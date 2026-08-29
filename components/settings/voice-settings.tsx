@@ -147,18 +147,56 @@ const MINIMAX_PREVIEW_TEXT: Record<string, string> = {
     Afrikaans: "Hallo, aangename kennis. Dit is 'n Afrikaanse stemvoorbeeld.",
 };
 
-const DEFAULT_MINIMAX_VOICES = [
-    { id: "male-qn-qingse", name: "青涩青年音 (male-qn-qingse)" },
-    { id: "female-shaonv", name: "少女音 (female-shaonv)" },
-    { id: "female-yujie", name: "御姐音 (female-yujie)" },
-    { id: "male-qn-badao", name: "霸道青年音 (male-qn-badao)" },
-    { id: "Wise_Woman", name: "知性女音 (Wise_Woman)" },
-    { id: "Friendly_Person", name: "亲切和蔼 (Friendly_Person)" },
-    { id: "Calm_Woman", name: "冷静女音 (Calm_Woman)" },
-    { id: "Cantonese_GentleLady", name: "粤语温柔女声 (Cantonese_GentleLady)" },
-    { id: "Cantonese_PlayfulMan", name: "粤语活泼男声 (Cantonese_PlayfulMan)" },
-    { id: "Cantonese_CuteGirl", name: "粤语可爱女孩 (Cantonese_CuteGirl)" },
-    { id: "Cantonese_KindWoman", name: "粤语善良女声 (Cantonese_KindWoman)" },
+const DEFAULT_MINIMAX_VOICES: VoiceOption[] = [
+    // ── 普通话系统音色（男女青年、情绪、角色、播音、特色） ──
+    { id: "male-qn-qingse", name: "青涩青年音 (male-qn-qingse)", category: "system" },
+    { id: "male-qn-badao", name: "霸道青年音 (male-qn-badao)", category: "system" },
+    { id: "male-qn-daxuesheng", name: "青年大学生 (male-qn-daxuesheng)", category: "system" },
+    { id: "female-shaonv", name: "少女音 (female-shaonv)", category: "system" },
+    { id: "female-yujie", name: "御姐音 (female-yujie)", category: "system" },
+    { id: "female-chengshu", name: "成熟女性 (female-chengshu)", category: "system" },
+    { id: "female-tianmei", name: "甜美女生 (female-tianmei)", category: "system" },
+    { id: "female-chengshu-jingpin", name: "成熟女性音色-beta (female-chengshu-jingpin)", category: "system" },
+    { id: "Wise_Woman", name: "知性女音 (Wise_Woman)", category: "system" },
+    { id: "Friendly_Person", name: "亲切和蔼 (Friendly_Person)", category: "system" },
+    { id: "Calm_Woman", name: "冷静女音 (Calm_Woman)", category: "system" },
+    { id: "Warm_Man", name: "温暖男声 (Warm_Man)", category: "system" },
+    { id: "Empathetic_Man", name: "共情男声 (Empathetic_Man)", category: "system" },
+    { id: "Deep_Man", name: "深沉男声 (Deep_Man)", category: "system" },
+    { id: "Inspiring_Man", name: "励志男声 (Inspiring_Man)", category: "system" },
+    { id: "Lively_Girl", name: "活泼女孩 (Lively_Girl)", category: "system" },
+    { id: "Sweet_Girl", name: "甜美女孩 (Sweet_Girl)", category: "system" },
+    { id: "Cute_Girl", name: "可爱女孩 (Cute_Girl)", category: "system" },
+    { id: "Charming_Lady", name: "魅力女声 (Charming_Lady)", category: "system" },
+    { id: "Elegant_Lady", name: "优雅女声 (Elegant_Lady)", category: "system" },
+    { id: "News_Anchor_Male", name: "男声新闻播音 (News_Anchor_Male)", category: "system" },
+    { id: "News_Anchor_Female", name: "女声新闻播音 (News_Anchor_Female)", category: "system" },
+    { id: "Audiobook_Male_1", name: "男声有声书 1 (Audiobook_Male_1)", category: "system" },
+    { id: "Audiobook_Male_2", name: "男声有声书 2 (Audiobook_Male_2)", category: "system" },
+    { id: "Audiobook_Female_1", name: "女声有声书 1 (Audiobook_Female_1)", category: "system" },
+    { id: "Audiobook_Female_2", name: "女声有声书 2 (Audiobook_Female_2)", category: "system" },
+    { id: "Documentary_Male", name: "纪录片解说男声 (Documentary_Male)", category: "system" },
+    { id: "Boy_Child", name: "小男孩 (Boy_Child)", category: "system" },
+    { id: "Girl_Child", name: "小女孩 (Girl_Child)", category: "system" },
+    { id: "Old_Man", name: "慈祥老爷爷 (Old_Man)", category: "system" },
+    { id: "Old_Woman", name: "慈祥老奶奶 (Old_Woman)", category: "system" },
+    { id: "moss_audio", name: "MOSS 特色音 (moss_audio)", category: "system" },
+
+    // ── 粤语方言音色 ──
+    { id: "Cantonese_GentleLady", name: "粤语-温柔女声 (Cantonese_GentleLady)", category: "system" },
+    { id: "Cantonese_PlayfulMan", name: "粤语-活泼男声 (Cantonese_PlayfulMan)", category: "system" },
+    { id: "Cantonese_CuteGirl", name: "粤语-可爱女孩 (Cantonese_CuteGirl)", category: "system" },
+    { id: "Cantonese_KindWoman", name: "粤语-善良女声 (Cantonese_KindWoman)", category: "system" },
+    { id: "Cantonese_MellowMan", name: "粤语-沉稳男声 (Cantonese_MellowMan)", category: "system" },
+    { id: "Cantonese_ProfessionalHost(F)", name: "粤语-专业女主持 (Cantonese_ProfessionalHost (F))", category: "system" },
+    { id: "Cantonese_ProfessionalHost(M)", name: "粤语-专业男主持 (Cantonese_ProfessionalHost (M))", category: "system" },
+
+    // ── 英语及外语音色 ──
+    { id: "English_Gentle_Lady", name: "英语-温柔女声 (English_Gentle_Lady)", category: "system" },
+    { id: "English_Deep_Man", name: "英语-深沉男声 (English_Deep_Man)", category: "system" },
+    { id: "English_Expressive_Narrator", name: "英语-生动叙述者 (English_Expressive_Narrator)", category: "system" },
+    { id: "Japanese_Anime_Girl", name: "日语-动漫少女 (Japanese_Anime_Girl)", category: "system" },
+    { id: "Japanese_Calm_Man", name: "日语-沉稳男声 (Japanese_Calm_Man)", category: "system" },
 ];
 
 const DEFAULT_OPENAI_VOICES = [
