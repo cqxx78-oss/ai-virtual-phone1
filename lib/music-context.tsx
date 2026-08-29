@@ -70,10 +70,12 @@ export function useMusicControlsOptional(): MusicControlsValue | null {
     return useContext(MusicControlsContext);
 }
 
-// ── Queue persistence ──
+// ── Queue & Track persistence ──
 
 const QUEUE_STORAGE_KEY = "ai_phone_music_queue_v1";
+const LAST_TRACK_STORAGE_KEY = "ai_phone_music_last_track_v1";
 registerKvMigration(QUEUE_STORAGE_KEY);
+registerKvMigration(LAST_TRACK_STORAGE_KEY);
 const QUEUE_MAX_SIZE = 200;
 
 function loadPersistedQueue(): MusicTrack[] {
@@ -90,13 +92,31 @@ function persistQueue(q: MusicTrack[]): void {
     try { kvSet(QUEUE_STORAGE_KEY, JSON.stringify(q.slice(0, QUEUE_MAX_SIZE))); } catch { /* ignore */ }
 }
 
+function loadPersistedLastTrack(): MusicTrack | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const raw = kvGet(LAST_TRACK_STORAGE_KEY);
+        if (!raw) return null;
+        const item = JSON.parse(raw);
+        return item && typeof item === "object" && typeof item.id === "string" ? item : null;
+    } catch { return null;
+    }
+}
+
+function persistLastTrack(track: MusicTrack | null): void {
+    try {
+        if (track) kvSet(LAST_TRACK_STORAGE_KEY, JSON.stringify(track));
+        else kvRemove(LAST_TRACK_STORAGE_KEY);
+    } catch { /* ignore */ }
+}
+
 // ── Provider ──
 
 export function MusicProvider({ children }: { children: ReactNode }) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const blobUrlRef = useRef<string | null>(null);
 
-    const [currentTrack, setCurrentTrack] = useState<MusicTrack | null>(null);
+    const [currentTrack, setCurrentTrack] = useState<MusicTrack | null>(() => loadPersistedLastTrack());
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -106,10 +126,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const [showFullPlayer, setShowFullPlayer] = useState(false);
     const [floatDismissed, setFloatDismissed] = useState(false);
 
-    // Persist queue on change.
+    // Persist queue & last track on change.
     useEffect(() => {
         persistQueue(queue);
     }, [queue]);
+
+    useEffect(() => {
+        persistLastTrack(currentTrack);
+    }, [currentTrack]);
 
     /** Wrapped setQueue with max size enforcement */
     const setQueue = useCallback((tracks: MusicTrack[]) => {
@@ -251,9 +275,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const togglePlay = useCallback(() => {
         const audio = audioRef.current;
         if (!audio) return;
+        if (!audio.src && currentTrack) {
+            loadAndPlay(currentTrack);
+            return;
+        }
         if (audio.paused) audio.play().catch(() => {});
         else audio.pause();
-    }, []);
+    }, [currentTrack, loadAndPlay]);
 
     const next = useCallback(() => {
         if (queue.length === 0 || !currentTrack) return;
