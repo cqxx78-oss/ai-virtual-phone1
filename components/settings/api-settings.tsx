@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useContext, useMemo } from "react";
-import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check } from "lucide-react";
+import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check, ArrowLeft, ArrowRight } from "lucide-react";
 import { SettingsContext } from "../phone-settings-app";
 import type { ApiConfig } from "@/lib/settings-types";
 import { loadApiConfigs, removeApiConfigReferences, saveApiConfigs } from "@/lib/settings-storage";
@@ -95,6 +95,16 @@ export function ApiSettings() {
 
     const updateConfig = (id: string, updates: Partial<ApiConfig>) => {
         persist(configs.map(c => c.id === id ? { ...c, ...updates } : c));
+    };
+
+    const moveConfig = (index: number, direction: "prev" | "next") => {
+        const targetIndex = direction === "prev" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= configs.length) return;
+        const next = [...configs];
+        const temp = next[index];
+        next[index] = next[targetIndex];
+        next[targetIndex] = temp;
+        persist(next);
     };
 
     const removeConfig = (id: string) => {
@@ -248,7 +258,7 @@ export function ApiSettings() {
                 </div>
             ) : (
                 <div className="grid grid-cols-2 gap-3">
-                    {configs.map(config => (
+                    {configs.map((config, index) => (
                         <div
                             key={config.id}
                             className="ui-config-card min-w-0 cursor-pointer"
@@ -269,7 +279,33 @@ export function ApiSettings() {
                                 <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">{config.name || config.provider}</span>
                                 <span className="menu-desc truncate">{config.defaultModel || config.provider || "未设置模型"}</span>
                             </div>
-                            <div className="flex gap-2 shrink-0 items-center justify-end">
+                            <div className="flex gap-1.5 shrink-0 items-center justify-end">
+                                {index > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            moveConfig(index, "prev");
+                                        }}
+                                        className="ui-link-btn"
+                                        title="前移"
+                                    >
+                                        <ArrowLeft size={16} />
+                                    </button>
+                                )}
+                                {index < configs.length - 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            moveConfig(index, "next");
+                                        }}
+                                        className="ui-link-btn"
+                                        title="后移"
+                                    >
+                                        <ArrowRight size={16} />
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={(event) => {
@@ -277,8 +313,9 @@ export function ApiSettings() {
                                         setEditingId(config.id);
                                     }}
                                     className="ui-link-btn"
+                                    title="编辑"
                                 >
-                                    <FileEdit size={18} />
+                                    <FileEdit size={16} />
                                 </button>
                                 <button
                                     type="button"
@@ -288,8 +325,9 @@ export function ApiSettings() {
                                     }}
                                     className="ui-link-btn"
                                     data-variant="danger"
+                                    title="删除"
                                 >
-                                    <Trash2 size={18} />
+                                    <Trash2 size={16} />
                                 </button>
                             </div>
                         </div>
