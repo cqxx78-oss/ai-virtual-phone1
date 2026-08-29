@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useContext, useMemo } from "react";
-import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check, ArrowLeft, ArrowRight } from "lucide-react";
+import { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
+import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check } from "lucide-react";
 import { SettingsContext } from "../phone-settings-app";
 import type { ApiConfig } from "@/lib/settings-types";
 import { loadApiConfigs, removeApiConfigReferences, saveApiConfigs } from "@/lib/settings-storage";
@@ -97,14 +97,69 @@ export function ApiSettings() {
         persist(configs.map(c => c.id === id ? { ...c, ...updates } : c));
     };
 
-    const moveConfig = (index: number, direction: "prev" | "next") => {
-        const targetIndex = direction === "prev" ? index - 1 : index + 1;
-        if (targetIndex < 0 || targetIndex >= configs.length) return;
+    // 拖拽排序逻辑
+    const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+    const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isTouchDragRef = useRef(false);
+    const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+
+    const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
+        if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= configs.length || toIndex >= configs.length) return;
         const next = [...configs];
-        const temp = next[index];
-        next[index] = next[targetIndex];
-        next[targetIndex] = temp;
+        const [removed] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, removed);
         persist(next);
+    }, [configs, persist]);
+
+    // 触摸端长按拖拽处理
+    const handleTouchStart = (index: number, e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+        isTouchDragRef.current = false;
+        if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+
+        touchTimerRef.current = setTimeout(() => {
+            isTouchDragRef.current = true;
+            setDraggingIndex(index);
+            if (navigator.vibrate) navigator.vibrate(40);
+        }, 350);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!touchStartPos.current) return;
+        const touch = e.touches[0];
+        const dx = Math.abs(touch.clientX - touchStartPos.current.x);
+        const dy = Math.abs(touch.clientY - touchStartPos.current.y);
+
+        // 未激活长按前如果手指移动较大，取消长按判定以允许正常滚动页面
+        if (!isTouchDragRef.current && (dx > 10 || dy > 10)) {
+            if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+            return;
+        }
+
+        if (isTouchDragRef.current) {
+            e.preventDefault(); // 阻止页面滚动
+            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
+            const cardEl = targetElement?.closest("[data-config-index]");
+            if (cardEl) {
+                const hoverIdx = Number(cardEl.getAttribute("data-config-index"));
+                if (!isNaN(hoverIdx) && hoverIdx !== dragOverIndex) {
+                    setDragOverIndex(hoverIdx);
+                }
+            }
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+        if (isTouchDragRef.current && draggingIndex !== null && dragOverIndex !== null) {
+            handleReorder(draggingIndex, dragOverIndex);
+        }
+        setDraggingIndex(null);
+        setDragOverIndex(null);
+        isTouchDragRef.current = false;
+        touchStartPos.current = null;
     };
 
     const removeConfig = (id: string) => {
@@ -258,80 +313,85 @@ export function ApiSettings() {
                 </div>
             ) : (
                 <div className="grid grid-cols-2 gap-3">
-                    {configs.map((config, index) => (
-                        <div
-                            key={config.id}
-                            className="ui-config-card min-w-0 cursor-pointer"
-                            style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between" }}
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`编辑 ${config.name || config.provider}`}
-                            onClick={() => setEditingId(config.id)}
-                            onKeyDown={(event) => {
-                                if (event.target !== event.currentTarget) return;
-                                if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
+                    {configs.map((config, index) => {
+                        const isDragging = draggingIndex === index;
+                        const isDragOver = dragOverIndex === index;
+                        return (
+                            <div
+                                key={config.id}
+                                data-config-index={index}
+                                draggable
+                                onDragStart={() => setDraggingIndex(index)}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    if (dragOverIndex !== index) setDragOverIndex(index);
+                                }}
+                                onDragEnd={() => {
+                                    if (draggingIndex !== null && dragOverIndex !== null) {
+                                        handleReorder(draggingIndex, dragOverIndex);
+                                    }
+                                    setDraggingIndex(null);
+                                    setDragOverIndex(null);
+                                }}
+                                onTouchStart={(e) => handleTouchStart(index, e)}
+                                onTouchMove={handleTouchMove}
+                                onTouchEnd={handleTouchEnd}
+                                onTouchCancel={handleTouchEnd}
+                                className={`ui-config-card min-w-0 cursor-pointer select-none transition-all ${
+                                    isDragging
+                                        ? "opacity-60 scale-105 shadow-xl ring-2 ring-black z-20"
+                                        : isDragOver
+                                            ? "ring-2 ring-black scale-98 bg-black/5"
+                                            : ""
+                                }`}
+                                style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between", touchAction: "manipulation" }}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`编辑 ${config.name || config.provider}`}
+                                onClick={() => {
+                                    if (isTouchDragRef.current) return;
                                     setEditingId(config.id);
-                                }
-                            }}
-                        >
-                            <div className="min-w-0 flex flex-col gap-1">
-                                <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">{config.name || config.provider}</span>
-                                <span className="menu-desc truncate">{config.defaultModel || config.provider || "未设置模型"}</span>
-                            </div>
-                            <div className="flex gap-1.5 shrink-0 items-center justify-end">
-                                {index > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            moveConfig(index, "prev");
-                                        }}
-                                        className="ui-link-btn"
-                                        title="前移"
-                                    >
-                                        <ArrowLeft size={16} />
-                                    </button>
-                                )}
-                                {index < configs.length - 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            moveConfig(index, "next");
-                                        }}
-                                        className="ui-link-btn"
-                                        title="后移"
-                                    >
-                                        <ArrowRight size={16} />
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={(event) => {
-                                        event.stopPropagation();
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.target !== event.currentTarget) return;
+                                    if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault();
                                         setEditingId(config.id);
-                                    }}
-                                    className="ui-link-btn"
-                                    title="编辑"
-                                >
-                                    <FileEdit size={16} />
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        setConfirmDeleteId(config.id);
-                                    }}
-                                    className="ui-link-btn"
-                                    data-variant="danger"
-                                    title="删除"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                    }
+                                }}
+                            >
+                                <div className="min-w-0 flex flex-col gap-1 pointer-events-none">
+                                    <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">{config.name || config.provider}</span>
+                                    <span className="menu-desc truncate">{config.defaultModel || config.provider || "未设置模型"}</span>
+                                </div>
+                                <div className="flex gap-2 shrink-0 items-center justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setEditingId(config.id);
+                                        }}
+                                        className="ui-link-btn"
+                                        title="编辑"
+                                    >
+                                        <FileEdit size={18} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setConfirmDeleteId(config.id);
+                                        }}
+                                        className="ui-link-btn"
+                                        data-variant="danger"
+                                        title="删除"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
