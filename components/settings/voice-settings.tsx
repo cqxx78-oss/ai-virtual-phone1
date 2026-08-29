@@ -1024,9 +1024,13 @@ export function VoiceSettings() {
 
                 // Grouping for Minimax
                 const cantoneseVoices = isMinimax ? options.filter(v => v.id.startsWith("Cantonese_") || v.name.includes("粤语")) : [];
-                const englishVoices = isMinimax ? options.filter(v => /^[A-Za-z]/.test(v.id) && !v.id.startsWith("male-") && !v.id.startsWith("female-") && !v.id.startsWith("Cantonese_") && !v.id.startsWith("Chinese")) : [];
-                const mandarinVoices = isMinimax ? options.filter(v => !cantoneseVoices.includes(v) && !englishVoices.includes(v) && !v.id.startsWith("voice_") && !v.id.startsWith("ttv-")) : options;
                 const customOrGenVoices = isMinimax ? options.filter(v => v.id.startsWith("voice_") || v.id.startsWith("ttv-") || targetConfig.customVoices?.some(cv => cv.id === v.id)) : [];
+                const mandarinVoices = isMinimax ? options.filter(v => {
+                    if (cantoneseVoices.includes(v) || customOrGenVoices.includes(v)) return false;
+                    // 普通话系统音色：male-/female- 开头，或 Chinese 开头，或中文名音色
+                    return v.id.startsWith("male-") || v.id.startsWith("female-") || v.id.startsWith("Chinese") || /[\u4e00-\u9fa5]/.test(v.name);
+                }) : options;
+                const englishVoices = isMinimax ? options.filter(v => !cantoneseVoices.includes(v) && !customOrGenVoices.includes(v) && !mandarinVoices.includes(v)) : [];
 
                 const renderVoiceItem = (v: VoiceOption) => {
                     const isFav = favoriteVoices.includes(v.id);
