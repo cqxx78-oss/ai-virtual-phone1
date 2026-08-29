@@ -241,6 +241,7 @@ export function VoiceSettings() {
     const [manualVoiceIds, setManualVoiceIds] = useState<Record<string, boolean>>({});
     const [isLoaded, setIsLoaded] = useState(false);
     const [voicePickerTargetId, setVoicePickerTargetId] = useState<string | null>(null);
+    const [activeCategoryTab, setActiveCategoryTab] = useState<string>("fav");
     const [favoriteVoices, setFavoriteVoices] = useState<string[]>(() => {
         if (typeof window === "undefined") return [];
         try {
@@ -1092,27 +1093,53 @@ export function VoiceSettings() {
                                 </div>
                             </div>
 
-                            <div className="modal-body flex-1 overflow-y-auto hide-scrollbar space-y-4 p-4" data-ui="modal-body">
-                                {/* 常用收藏分组 - 固定置顶 */}
-                                <div className="space-y-1.5">
-                                    <div className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 px-1">
-                                        <Star size={13} className="fill-amber-500 text-amber-500" />
-                                        <span>我的收藏</span>
-                                    </div>
-                                    {favorites.length > 0 ? (
-                                        <div className="bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl p-1 space-y-0.5 border border-amber-500/20">
-                                            {favorites.map(renderVoiceItem)}
-                                        </div>
-                                    ) : (
-                                        <div className="text-xs text-gray-400 italic px-3 py-2 bg-black/5 dark:bg-white/5 rounded-xl text-center">
-                                            暂无收藏音色（点击右侧星星即可收藏）
-                                        </div>
-                                    )}
+                            {isMinimax && (
+                                <div className="flex items-center gap-1.5 px-4 py-2 border-b border-black/5 dark:border-white/5 overflow-x-auto hide-scrollbar shrink-0 bg-black/[0.02] dark:bg-white/[0.02]">
+                                    {[
+                                        { id: "fav", label: "收藏" },
+                                        { id: "mandarin", label: "普通话" },
+                                        { id: "cantonese", label: "粤语" },
+                                        { id: "foreign", label: "英语/外语" },
+                                        ...(customOrGenVoices.length > 0 ? [{ id: "custom", label: "克隆/文生" }] : []),
+                                    ].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setActiveCategoryTab(tab.id)}
+                                            className={`px-3 py-1 text-xs rounded-full whitespace-nowrap transition-all font-medium ${
+                                                activeCategoryTab === tab.id
+                                                    ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
+                                                    : "bg-black/5 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-black/10 dark:hover:bg-white/10"
+                                            }`}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
                                 </div>
+                            )}
 
+                            <div className="modal-body flex-1 overflow-y-auto hide-scrollbar space-y-4 p-4" data-ui="modal-body">
+                                {/* 常用收藏分组 */}
+                                {activeCategoryTab === "fav" && (
+                                    <div className="space-y-1.5">
+                                        <div className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1 px-1">
+                                            <Star size={13} className="fill-amber-500 text-amber-500" />
+                                            <span>我的收藏</span>
+                                        </div>
+                                        {favorites.length > 0 ? (
+                                            <div className="bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl p-1 space-y-0.5 border border-amber-500/20">
+                                                {favorites.map(renderVoiceItem)}
+                                            </div>
+                                        ) : (
+                                            <div className="text-xs text-gray-400 italic px-3 py-2 bg-black/5 dark:bg-white/5 rounded-xl text-center">
+                                                暂无收藏音色（点击右侧星星即可收藏）
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 {isMinimax ? (
                                     <>
-                                        {mandarinVoices.length > 0 && (
+                                        {activeCategoryTab === "mandarin" && mandarinVoices.length > 0 && (
                                             <div className="space-y-1.5">
                                                 <div className="text-xs font-bold text-gray-500 px-1">🗣️ 普通话系统音色</div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
@@ -1120,7 +1147,7 @@ export function VoiceSettings() {
                                                 </div>
                                             </div>
                                         )}
-                                        {cantoneseVoices.length > 0 && (
+                                        {activeCategoryTab === "cantonese" && cantoneseVoices.length > 0 && (
                                             <div className="space-y-1.5">
                                                 <div className="text-xs font-bold text-gray-500 px-1">🇭🇰 粤语方言音色</div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
@@ -1128,7 +1155,7 @@ export function VoiceSettings() {
                                                 </div>
                                             </div>
                                         )}
-                                        {englishVoices.length > 0 && (
+                                        {activeCategoryTab === "foreign" && englishVoices.length > 0 && (
                                             <div className="space-y-1.5">
                                                 <div className="text-xs font-bold text-gray-500 px-1">🌐 英语及其他语言音色</div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
@@ -1136,7 +1163,7 @@ export function VoiceSettings() {
                                                 </div>
                                             </div>
                                         )}
-                                        {customOrGenVoices.length > 0 && (
+                                        {activeCategoryTab === "custom" && customOrGenVoices.length > 0 && (
                                             <div className="space-y-1.5">
                                                 <div className="text-xs font-bold text-gray-500 px-1">🎙️ 我的克隆 / 文生音色</div>
                                                 <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
