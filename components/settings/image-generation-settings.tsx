@@ -275,7 +275,7 @@ export function ImageGenerationSettings() {
 
     // 头部新增按钮
     useEffect(() => {
-        setSubpageRightAction("image_generation",
+        setSubpageRightAction("imageGeneration",
             <button
                 onClick={addProfile}
                 className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[20px] bg-black px-4 text-xs font-bold text-white shadow-sm transition-all hover:bg-gray-800 hover:shadow-md active:scale-95 focus:outline-none"
@@ -284,7 +284,7 @@ export function ImageGenerationSettings() {
                 <span>新增生图方案</span>
             </button>
         );
-        return () => setSubpageRightAction("image_generation", null);
+        return () => setSubpageRightAction("imageGeneration", null);
     }, [addProfile, setSubpageRightAction]);
 
     const selectSize = useCallback((profile: ImageGenerationProfile, value: string) => {
