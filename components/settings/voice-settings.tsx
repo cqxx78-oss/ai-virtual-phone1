@@ -1148,7 +1148,7 @@ export function VoiceSettings() {
                                         { id: "mandarin", label: "普通话" },
                                         { id: "cantonese", label: "粤语" },
                                         { id: "foreign", label: "英语/外语" },
-                                        ...(customOrGenVoices.length > 0 ? [{ id: "custom", label: "克隆/文生" }] : []),
+                                        { id: "custom", label: "克隆/文生" },
                                     ].map(tab => (
                                         <button
                                             key={tab.id}
