@@ -1065,10 +1065,10 @@ export function VoiceSettings() {
                 };
 
                 return (
-                    <div className="modal-backdrop" data-ui="modal-backdrop" onClick={() => setVoicePickerTargetId(null)}>
+                    <div className="modal-overlay z-50" onClick={() => setVoicePickerTargetId(null)}>
                         <div
-                            className="modal-panel max-w-lg max-h-[85vh] flex flex-col"
-                            data-ui="modal-panel"
+                            className="modal-expand flex flex-col" style={{ width: "min(480px, calc(100% - 24px))", maxHeight: "85%", height: "auto" }}
+                            data-ui="modal-dialog"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="modal-header" data-ui="modal-header">
