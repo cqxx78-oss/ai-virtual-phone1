@@ -1061,14 +1061,24 @@ export function VoiceSettings() {
                 const isMinimax = targetConfig.provider === "Minimax";
                 const favorites = options.filter(v => favoriteVoices.includes(v.id));
 
-                // Grouping for Minimax
-                const cantoneseVoices = isMinimax ? options.filter(v => v.id.startsWith("Cantonese_") || v.name.includes("粤语")) : [];
-                const customOrGenVoices = isMinimax ? options.filter(v => v.id.startsWith("voice_") || v.id.startsWith("ttv-") || targetConfig.customVoices?.some(cv => cv.id === v.id)) : [];
-                const mandarinVoices = isMinimax ? options.filter(v => {
-                    if (cantoneseVoices.includes(v) || customOrGenVoices.includes(v)) return false;
-                    // 普通话系统音色：male-/female- 开头，或 Chinese 开头，或中文名音色
-                    return v.id.startsWith("male-") || v.id.startsWith("female-") || v.id.startsWith("Chinese") || /[\u4e00-\u9fa5]/.test(v.name);
-                }) : options;
+                // Grouping for Minimax (严格按规则清洗与分流)
+                const isCantoneseVoice = (v: VoiceOption) => v.id.startsWith("Cantonese_") || v.name.includes("粤语");
+                const hasChinese = (v: VoiceOption) => /[\u4e00-\u9fa5]/.test(v.name) || /[\u4e00-\u9fa5]/.test(v.id) || v.id.startsWith("male-") || v.id.startsWith("female-") || v.id.startsWith("Chinese");
+
+                // 真正的克隆/文生必须是明确标记为 cloning/generation 或属于用户自己上传的自定义音色，且排除已被明确识别为普通话/粤语系统音色项
+                const isRealClonedOrGen = (v: VoiceOption) => {
+                    if (targetConfig.customVoices?.some(cv => cv.id === v.id)) return true;
+                    if (v.category === "cloning" || v.category === "generation") return true;
+                    if (v.id.startsWith("ttv-")) return true;
+                    if (v.id.startsWith("voice_") && !hasChinese(v) && !isCantoneseVoice(v)) return true;
+                    return false;
+                };
+
+                const cantoneseVoices = isMinimax ? options.filter(v => isCantoneseVoice(v)) : [];
+                const customOrGenVoices = isMinimax ? options.filter(v => isRealClonedOrGen(v) && !cantoneseVoices.includes(v)) : [];
+                // 只要带有中文或属于标准中文音色编码，一律分入「普通话」
+                const mandarinVoices = isMinimax ? options.filter(v => !cantoneseVoices.includes(v) && !customOrGenVoices.includes(v) && hasChinese(v)) : options;
+                // 剩下的纯英文/非中文外语音色，一律归入「英语/外语」
                 const englishVoices = isMinimax ? options.filter(v => !cantoneseVoices.includes(v) && !customOrGenVoices.includes(v) && !mandarinVoices.includes(v)) : [];
 
                 const renderVoiceItem = (v: VoiceOption) => {
