@@ -1166,14 +1166,14 @@ export function VoiceSettings() {
                                 {activeCategoryTab === "fav" && (
                                     <div className="space-y-1.5">
                                         <div className="flex items-center justify-between px-1">
-                                            <div className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                            <div className="text-xs font-bold text-gray-500 flex items-center gap-1">
                                                 <Star size={13} className="fill-amber-500 text-amber-500" />
                                                 <span>我的收藏</span>
                                             </div>
                                             <span className="text-xs text-gray-400">{favorites.length} 个</span>
                                         </div>
                                         {favorites.length > 0 ? (
-                                            <div className="bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl p-1 space-y-0.5 border border-amber-500/20">
+                                            <div className="space-y-0.5 bg-black/5 dark:bg-white/5 rounded-2xl p-1">
                                                 {favorites.map(renderVoiceItem)}
                                             </div>
                                         ) : (
