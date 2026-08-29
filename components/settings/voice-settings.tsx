@@ -225,9 +225,9 @@ function defaultVoiceOptions(provider: string): VoiceOption[] {
 
 function voiceOptionsForConfig(config: VoiceApiConfig, fetchedVoices: Record<string, VoiceOption[]>): VoiceOption[] {
     return uniqueOptions([
-        ...(fetchedVoices[config.id] || []),
-        ...(config.customVoices || []),
         ...defaultVoiceOptions(config.provider),
+        ...(config.customVoices || []),
+        ...(fetchedVoices[config.id] || []),
     ]);
 }
 
@@ -1065,12 +1065,16 @@ export function VoiceSettings() {
 
                 // Grouping for Minimax (严格按规则清洗与分流)
                 const isCantoneseVoice = (v: VoiceOption) => v.id.startsWith("Cantonese_") || v.name.includes("粤语");
+                const isForeignVoice = (v: VoiceOption) => v.id.includes("English") || v.id.includes("Japanese") || v.name.includes("英语") || v.name.includes("日语") || v.name.includes("外语");
                 const hasChinese = (v: VoiceOption) => /[\u4e00-\u9fa5]/.test(v.name) || /[\u4e00-\u9fa5]/.test(v.id) || v.id.startsWith("male-") || v.id.startsWith("female-") || v.id.startsWith("Chinese");
 
-                const officialVoices = isMinimax ? options.filter(v => v.category === "official") : [];
+                // 预设的系统音色，即使从接口拉回来，也视为普通音色
+                const isSystemDefault = (v: VoiceOption) => v.category === "system" && !v.createdAt;
+
+                const officialVoices = isMinimax ? options.filter(v => v.category === "official" && !isSystemDefault(v)) : [];
                 const cantoneseVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && isCantoneseVoice(v)) : [];
-                const mandarinVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && !cantoneseVoices.includes(v) && hasChinese(v)) : options;
-                const foreignVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && !cantoneseVoices.includes(v) && !mandarinVoices.includes(v)) : [];
+                const foreignVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && !cantoneseVoices.includes(v) && (isForeignVoice(v) || !hasChinese(v))) : [];
+                const mandarinVoices = isMinimax ? options.filter(v => !officialVoices.includes(v) && !cantoneseVoices.includes(v) && !foreignVoices.includes(v)) : options;
 
                 const renderVoiceItem = (v: VoiceOption) => {
                     const isFav = favoriteVoices.includes(v.id);
