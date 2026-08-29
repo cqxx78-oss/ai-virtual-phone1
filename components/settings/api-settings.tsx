@@ -146,6 +146,12 @@ export function ApiSettings() {
                 const hoverIdx = Number(cardEl.getAttribute("data-config-index"));
                 if (!isNaN(hoverIdx) && hoverIdx !== dragOverIndex) {
                     setDragOverIndex(hoverIdx);
+                    // 实时换位并更新当前拖拽指针
+                    if (draggingIndex !== null && hoverIdx !== draggingIndex) {
+                        handleReorder(draggingIndex, hoverIdx);
+                        setDraggingIndex(hoverIdx);
+                        if (navigator.vibrate) navigator.vibrate(25);
+                    }
                 }
             }
         }
@@ -324,12 +330,12 @@ export function ApiSettings() {
                                 onDragStart={() => setDraggingIndex(index)}
                                 onDragOver={(e) => {
                                     e.preventDefault();
-                                    if (dragOverIndex !== index) setDragOverIndex(index);
+                                    if (draggingIndex !== null && draggingIndex !== index) {
+                                        handleReorder(draggingIndex, index);
+                                        setDraggingIndex(index);
+                                    }
                                 }}
                                 onDragEnd={() => {
-                                    if (draggingIndex !== null && dragOverIndex !== null) {
-                                        handleReorder(draggingIndex, dragOverIndex);
-                                    }
                                     setDraggingIndex(null);
                                     setDragOverIndex(null);
                                 }}
