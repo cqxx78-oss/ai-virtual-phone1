@@ -1944,15 +1944,29 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
             const pending = imgs.filter(img => !img.complete);
             console.log(`[SCROLL] imgs total=${imgs.length}, pending=${pending.length}`);
 
-            if (pending.length === 0) {
+            // 不管有没有 pending 图片，连续跑几帧贴底：
+            // - 挂载瞬间 --chat-bottom-reserve 还没设上去 / 字体还没加载完，scrollHeight 是偏小的旧值；
+            // - 等下一帧 padding 生效、scrollHeight 涨上来，再贴一次才能贴到真正的底。
+            const stickToBottomNow = () => {
+                if (initialScrollVersionRef.current !== scrollVersion || loadingMoreRef.current) return;
                 el.scrollTop = el.scrollHeight;
-                if (typeof window !== "undefined" && window.requestAnimationFrame) {
-                    window.requestAnimationFrame(() => {
-                        el.scrollTop = el.scrollHeight;
-                    });
-                }
+            };
+            stickToBottomNow();
+            let raf1 = 0, raf2 = 0, raf3 = 0;
+            raf1 = window.requestAnimationFrame(stickToBottomNow);
+            raf2 = window.requestAnimationFrame(() => window.requestAnimationFrame(stickToBottomNow));
+            raf3 = window.setTimeout(stickToBottomNow, 120);
+            void raf1; void raf2; void raf3;
+
+            if (pending.length === 0) {
                 console.log(`[SCROLL] done (no pending), sH=${el.scrollHeight}`);
             } else {
+                // 等所有图片 decode 完成（用 decode() + load/error 双保险）
+                // 再做一次最终贴底，覆盖头像 / 表情包异步完成导致的高度变化
+                Promise.all(pending.map(img => img.decode().catch(() => {}))).then(() => {
+                    stickToBottomNow();
+                    window.requestAnimationFrame(stickToBottomNow);
+                });
                 let loaded = 0;
                 const onDone = () => {
                     loaded++;
