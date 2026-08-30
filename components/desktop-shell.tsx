@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ErrorInfo, type ReactNode } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 
 import { updateStatusBarTone } from "@/lib/bg-tone";
 import { startDiaryEntryTimerService, stopDiaryEntryTimerService } from "@/lib/diary-entry-timer-service";
@@ -1117,54 +1118,15 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   );
   const [savedTheme, setSavedTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
   const [draftTheme, setDraftTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
-  const appHistoryPushedRef = useRef(false);
-  const isPopStateClosingRef = useRef(false);
-
   useEffect(() => {
     activeAppRef.current = activeApp;
-    if (activeApp && !appHistoryPushedRef.current) {
-      // 打开应用：向历史栈压入一层守卫，用于拦截物理返回键
-      window.history.pushState({ appOpen: true, appId: activeApp }, "");
-      appHistoryPushedRef.current = true;
-    } else if (!activeApp && appHistoryPushedRef.current) {
-      // 如果是用户点击界面 UI 按钮关闭应用（而非物理返回键触发），
-      // 需要主动将历史栈里的守卫弹出，确保历史栈与桌面状态 1:1 同步干净。
-      if (!isPopStateClosingRef.current) {
-        try {
-          window.history.back();
-        } catch {}
-      }
-      appHistoryPushedRef.current = false;
-      isPopStateClosingRef.current = false;
+    if (activeApp) {
+      // 打开任何应用时，在中央导航栈中压入一层返回，出栈时自动回到桌面 (setActiveApp(null))
+      return pushNav(() => {
+        setActiveApp(null);
+      }, `app:${activeApp}`);
     }
   }, [activeApp]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      // 物理返回键 / 侧滑手势触发时，先询问当前应用是否能自己处理子页面回退
-      // （如日记本→日记详情、设置→子页、购物→商品详情、聊天室→消息列表等）。
-      const handler = (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler;
-      if (typeof handler === "function") {
-        try {
-          if (handler()) {
-            // 如果应用内部消费了这次返回，说明依然留在应用内（回到上级子页），
-            // 立即补推一层历史守卫，维持下一次物理返回依然能够被拦截。
-            window.history.pushState({ appOpen: true, appId: activeAppRef.current }, "");
-            return;
-          }
-        } catch {
-          // 应用处理异常时降级为关闭应用
-        }
-      }
-      if (appHistoryPushedRef.current) {
-        isPopStateClosingRef.current = true;
-        appHistoryPushedRef.current = false;
-        setActiveApp(null);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
   // Listen for theme CSS updates from 小卷
   useEffect(() => {
     const onThemeUpdate = () => {

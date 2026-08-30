@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { Bot, ChevronLeft, Clock3, NotebookPen, Trash2, WandSparkles, X } from "lucide-react";
 import { DotsThree } from "@phosphor-icons/react";
 
@@ -663,42 +664,54 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
   );
   const activeBookBusy = Boolean(activeBook && generatingCharacterIds.includes(activeBook.characterId));
 
-  // 注册全局返回键处理器：手记内多层子页面（角色日记本→单篇日记详情→各设置/写作/字体面板→删除确认）
-  // 优先自己消化；只有在"日记本列表主页"才让桌面关闭整个应用。
+  // 角色日记本、日记详情、设置/写作/字体面板、删除确认等各进一层导航栈
   useEffect(() => {
-    const canHandle = () => {
-      if (deleteCandidateEntry) {
-        setDeleteCandidateEntry(null);
-        return true;
-      }
-      if (activeEntry) {
-        setActiveEntry(null);
-        return true;
-      }
-      if (timerSettingsOpen) {
-        setTimerSettingsOpen(false);
-        return true;
-      }
-      if (writePanelOpen) {
-        setWritePanelOpen(false);
-        return true;
-      }
-      if (fontPanelOpen) {
-        setFontPanelOpen(false);
-        return true;
-      }
-      if (activeBook) {
+    if (activeBook) {
+      return pushNav(() => {
         setActiveCharacterId(null);
-        return true;
-      }
-      return false;
-    };
-    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
-    return () => {
-      const w = window as unknown as { __phoneBackHandler?: () => boolean };
-      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
-    };
-  }, [activeBook, activeEntry, deleteCandidateEntry, fontPanelOpen, timerSettingsOpen, writePanelOpen]);
+      }, `diary:book:${activeCharacterId}`);
+    }
+  }, [activeBook, activeCharacterId]);
+
+  useEffect(() => {
+    if (activeEntry) {
+      return pushNav(() => {
+        setActiveEntry(null);
+      }, `diary:entry:${activeEntry.id}`);
+    }
+  }, [activeEntry]);
+
+  useEffect(() => {
+    if (fontPanelOpen) {
+      return pushNav(() => {
+        setFontPanelOpen(false);
+      }, "diary:fontPanel");
+    }
+  }, [fontPanelOpen]);
+
+  useEffect(() => {
+    if (timerSettingsOpen) {
+      return pushNav(() => {
+        setTimerSettingsOpen(false);
+      }, "diary:timerSettings");
+    }
+  }, [timerSettingsOpen]);
+
+  useEffect(() => {
+    if (writePanelOpen) {
+      return pushNav(() => {
+        setWritePanelOpen(false);
+      }, "diary:writePanel");
+    }
+  }, [writePanelOpen]);
+
+  useEffect(() => {
+    if (deleteCandidateEntry) {
+      return pushNav(() => {
+        setDeleteCandidateEntry(null);
+      }, "diary:deleteConfirm");
+    }
+  }, [deleteCandidateEntry]);
 
   return (
     <section className={`diary-app diary-entry-app ${entryDrag ? "is-entry-dragging" : ""}`} style={diaryEntryStyle}>

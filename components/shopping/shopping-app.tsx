@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import {
   AlertCircle,
   Check,
@@ -505,74 +506,86 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     return () => window.clearInterval(timer);
   }, [state.orders.length]);
 
-  // 注册全局返回键处理器：购物应用内的多层子页面（商品详情、订单详情、设置、翻译预览、
-  // 各种确认弹窗、黑市）优先自己消化；只在主 tab 主页才让桌面关闭整个应用。
+  // 商品详情、订单详情、黑市、设置、弹窗等各进一层导航栈
   useEffect(() => {
-    const canHandle = () => {
-      // 各种确认弹窗（顶层，按 Esc/返回最容易先关）
-      if (confirmCartDeleteItemId) {
-        setConfirmCartDeleteItemId(null);
-        return true;
-      }
-      if (confirmCheckoutOpen) {
-        setConfirmCheckoutOpen(false);
-        return true;
-      }
-      if (confirmRefreshOpen) {
-        setConfirmRefreshOpen(false);
-        return true;
-      }
-      if (clearConfirmOpen) {
-        setClearConfirmOpen(false);
-        return true;
-      }
-      if (paymentRequestOpen) {
-        setPaymentRequestOpen(false);
-        return true;
-      }
-      // 翻译预览、设置面板（高优先级，覆盖在内容之上）
-      if (translationPreview) {
-        setTranslationPreview(null);
-        return true;
-      }
-      if (promptOpen) {
-        setPromptOpen(false);
-        return true;
-      }
-      // 黑市（整页覆盖）
-      if (blackMarketOpen) {
-        setBlackMarketOpen(false);
-        return true;
-      }
-      // 商品详情
-      if (selectedProduct) {
+    if (selectedProduct) {
+      return pushNav(() => {
         setSelectedProduct(null);
-        return true;
-      }
-      // 订单详情
-      if (selectedOrderId) {
+      }, `shopping:product:${selectedProduct.id}`);
+    }
+  }, [selectedProduct]);
+
+  useEffect(() => {
+    if (selectedOrderId) {
+      return pushNav(() => {
         setSelectedOrderId(null);
-        return true;
-      }
-      return false;
-    };
-    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
-    return () => {
-      const w = window as unknown as { __phoneBackHandler?: () => boolean };
-      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
-    };
-  }, [
-    blackMarketOpen,
-    clearConfirmOpen,
-    confirmCartDeleteItemId,
-    confirmCheckoutOpen,
-    confirmRefreshOpen,
-    paymentRequestOpen,
-    promptOpen,
-    selectedOrderId,
-    selectedProduct,
-    translationPreview,
-  ]);
+      }, `shopping:order:${selectedOrderId}`);
+    }
+  }, [selectedOrderId]);
+
+  useEffect(() => {
+    if (blackMarketOpen) {
+      return pushNav(() => {
+        setBlackMarketOpen(false);
+      }, "shopping:blackMarket");
+    }
+  }, [blackMarketOpen]);
+
+  useEffect(() => {
+    if (promptOpen) {
+      return pushNav(() => {
+        setPromptOpen(false);
+      }, "shopping:promptSettings");
+    }
+  }, [promptOpen]);
+
+  useEffect(() => {
+    if (translationPreview) {
+      return pushNav(() => {
+        setTranslationPreview(null);
+      }, "shopping:translation");
+    }
+  }, [translationPreview]);
+
+  useEffect(() => {
+    if (paymentRequestOpen) {
+      return pushNav(() => {
+        setPaymentRequestOpen(false);
+      }, "shopping:paymentRequest");
+    }
+  }, [paymentRequestOpen]);
+
+  useEffect(() => {
+    if (clearConfirmOpen) {
+      return pushNav(() => {
+        setClearConfirmOpen(false);
+      }, "shopping:clearConfirm");
+    }
+  }, [clearConfirmOpen]);
+
+  useEffect(() => {
+    if (confirmRefreshOpen) {
+      return pushNav(() => {
+        setConfirmRefreshOpen(false);
+      }, "shopping:confirmRefresh");
+    }
+  }, [confirmRefreshOpen]);
+
+  useEffect(() => {
+    if (confirmCheckoutOpen) {
+      return pushNav(() => {
+        setConfirmCheckoutOpen(false);
+      }, "shopping:confirmCheckout");
+    }
+  }, [confirmCheckoutOpen]);
+
+  useEffect(() => {
+    if (confirmCartDeleteItemId) {
+      return pushNav(() => {
+        setConfirmCartDeleteItemId(null);
+      }, "shopping:cartDeleteConfirm");
+    }
+  }, [confirmCartDeleteItemId]);
 
   function persist(updater: (current: ShoppingState) => ShoppingState) {
     setState(current => saveShoppingState(updater(current)));

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, createContext, type CSSProperties, type ReactNode } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { Activity, Check, ChevronRight, Clock, Database, FileText, Fingerprint, Globe, HardDrive, Image, Info, KeyRound, Laptop, Layers, Link2, Loader2, LogOut, MessageSquare, Mic, SlidersHorizontal, UserCircle, Wrench, X, CloudUpload } from "lucide-react";
 import { ConfirmDialog } from "./ui/modal";
 import { useAccount } from "@/lib/account-context";
@@ -206,27 +207,20 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
         }
     };
 
-    // 注册全局返回键处理器：应用内有子页面时自己消化
-    // （API 设置、语音、预设、世界书、正则等子页），退到主页才让桌面关掉整个应用。
+    // 进入设置子页面或自定义子面板时，压入一层导航栈
     useEffect(() => {
-        const canHandle = () => {
-            if (overrideBack) {
+        if (overrideBack) {
+            return pushNav(() => {
                 overrideBack();
-                return true;
-            }
-            if (currentPage !== "main") {
+            }, "settings:override");
+        }
+        if (currentPage !== "main") {
+            return pushNav(() => {
                 setCurrentPage("main");
                 setSubpageTitle(null);
                 setOverrideBack(null);
-                return true;
-            }
-            return false;
-        };
-        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
-        return () => {
-            const w = window as unknown as { __phoneBackHandler?: () => boolean };
-            if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
-        };
+            }, `settings:${currentPage}`);
+        }
     }, [currentPage, overrideBack]);
 
     const makeCardItem = (item: typeof SETTINGS_MENU[number]): CardItem => ({

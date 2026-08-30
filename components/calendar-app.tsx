@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { Bot, Check, ChevronLeft, HeartPulse, Plus, Trash2, Wand2, X } from "lucide-react";
 import { Avatar } from "./ui/primitives";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
@@ -152,50 +153,70 @@ export function PhoneCalendarApp({
   const [editingItem, setEditingItem] = useState<(CalendarEventDraft & { originalDate?: string }) | null>(null);
   const autoGenerateEnabled = config.autoGenerateEnabled;
 
-  // 注册全局返回键处理器：日历内的详情/各种面板/编辑/确认弹窗优先自己消化；
-  // 退到月视图主页才让桌面关闭整个应用。
+  // 日历详情、面板、编辑等各进一层导航栈
   useEffect(() => {
-    const canHandle = () => {
-      if (editingItem) {
+    if (editingItem) {
+      return pushNav(() => {
         setEditingItem(null);
-        return true;
-      }
-      if (showGenerateConfirm) {
+      }, "calendar:editingItem");
+    }
+  }, [editingItem]);
+
+  useEffect(() => {
+    if (showGenerateConfirm) {
+      return pushNav(() => {
         setShowGenerateConfirm(false);
-        return true;
-      }
-      if (showAutoConfirm) {
+      }, "calendar:generateConfirm");
+    }
+  }, [showGenerateConfirm]);
+
+  useEffect(() => {
+    if (showAutoConfirm) {
+      return pushNav(() => {
         setShowAutoConfirm(false);
-        return true;
-      }
-      if (showThemePanel) {
+      }, "calendar:autoConfirm");
+    }
+  }, [showAutoConfirm]);
+
+  useEffect(() => {
+    if (showThemePanel) {
+      return pushNav(() => {
         setShowThemePanel(false);
-        return true;
-      }
-      if (showDaysPanel) {
+      }, "calendar:themePanel");
+    }
+  }, [showThemePanel]);
+
+  useEffect(() => {
+    if (showDaysPanel) {
+      return pushNav(() => {
         setShowDaysPanel(false);
-        return true;
-      }
-      if (showMenstrualSettings) {
+      }, "calendar:daysPanel");
+    }
+  }, [showDaysPanel]);
+
+  useEffect(() => {
+    if (showMenstrualSettings) {
+      return pushNav(() => {
         setShowMenstrualSettings(false);
-        return true;
-      }
-      if (fabMenuOpen) {
+      }, "calendar:menstrualSettings");
+    }
+  }, [showMenstrualSettings]);
+
+  useEffect(() => {
+    if (fabMenuOpen) {
+      return pushNav(() => {
         setFabMenuOpen(false);
-        return true;
-      }
-      if (view === "detail") {
+      }, "calendar:fabMenu");
+    }
+  }, [fabMenuOpen]);
+
+  useEffect(() => {
+    if (view === "detail") {
+      return pushNav(() => {
         setView("month");
-        return true;
-      }
-      return false;
-    };
-    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
-    return () => {
-      const w = window as unknown as { __phoneBackHandler?: () => boolean };
-      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
-    };
-  }, [editingItem, fabMenuOpen, showAutoConfirm, showDaysPanel, showGenerateConfirm, showMenstrualSettings, showThemePanel, view]);
+      }, "calendar:detail");
+    }
+  }, [view]);
 
   const [menstrualDraft, setMenstrualDraft] = useState<{
     cycleLength: string;

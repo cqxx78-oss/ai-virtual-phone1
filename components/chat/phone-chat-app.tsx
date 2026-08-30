@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState, useEffect, useRef, useCallback } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { ChatMessageList } from "./chat-message-list";
 import { ChatContactsList } from "./chat-contacts-list";
 import { MomentsFeed } from "./moments-feed";
@@ -200,31 +201,24 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         setActiveTab("messages");
     };
 
-    // 注册全局返回键处理器：统一由桌面中央历史栈调度
-    // 优先层级：1. 退出聊天室/桌宠；2. 关闭联系人添加弹层；3. 退出全屏 CSS 编辑器等子页面。
+    // 进入聊天室/桌宠聊天室时，在导航栈压入一层返回，出栈时自动退出聊天室
     useEffect(() => {
-        const canHandle = () => {
-            if (activeSession || activeMascot) {
+        if (activeSession || activeMascot) {
+            return pushNav(() => {
                 setActiveSession(null);
                 setActiveMascot(false);
-                return true;
-            }
-            if (pendingAddContactId) {
+            }, "chat:room");
+        }
+    }, [activeSession, activeMascot]);
+
+    // 进入添加联系人面板时，压入一层返回
+    useEffect(() => {
+        if (pendingAddContactId) {
+            return pushNav(() => {
                 setPendingAddContactId(null);
-                return true;
-            }
-            if (hideTabBar) {
-                window.dispatchEvent(new CustomEvent("chat-back-from-subpage"));
-                return true;
-            }
-            return false;
-        };
-        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
-        return () => {
-            const w = window as unknown as { __phoneBackHandler?: () => boolean };
-            if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
-        };
-    }, [activeSession, activeMascot, hideTabBar, pendingAddContactId]);
+            }, "chat:addContact");
+        }
+    }, [pendingAddContactId]);
 
     const handleRoomBack = useCallback(() => {
         setActiveSession(null);

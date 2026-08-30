@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { Brain, MoreHorizontal, Sparkles } from "lucide-react";
 import { MemoryBankPage } from "./memory/memory-bank-page";
 import { VnAssetPage } from "./vn/vn-asset-page";
@@ -63,40 +64,31 @@ export function PhoneResourcesApp({ onClose, onNotice, initialPage }: { onClose:
         }
     };
 
-    // 注册全局返回键处理器：资源库内子页面（记忆库/漫卷/记忆详情/记忆设置）
-    // 优先自己消化；只有在主页才让桌面关闭整个应用。
+    // 资源库子页面（记忆库、漫卷、记忆详情、记忆设置）各进一层导航栈
     useEffect(() => {
-        const canHandle = () => {
-            if (currentPage === "memory") {
-                if (memoryView === "settings") {
+        if (currentPage === "memory") {
+            if (memoryView === "settings") {
+                return pushNav(() => {
                     setMemoryView(prevMemoryView);
-                    return true;
-                }
-                if (memoryView === "detail") {
+                }, "resources:memory:settings");
+            }
+            if (memoryView === "detail") {
+                return pushNav(() => {
                     setMemoryView("list");
-                    return true;
-                }
+                }, "resources:memory:detail");
+            }
+            return pushNav(() => {
                 setCurrentPage("main");
                 setMemoryView("list");
                 setMemoryCharId("");
                 setMemoryCharName("");
-                return true;
-            }
-            if (currentPage === "vn_assets") {
+            }, "resources:memory");
+        }
+        if (currentPage === "vn_assets") {
+            return pushNav(() => {
                 setCurrentPage("main");
-                return true;
-            }
-            if (currentPage !== "main") {
-                setCurrentPage("main");
-                return true;
-            }
-            return false;
-        };
-        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
-        return () => {
-            const w = window as unknown as { __phoneBackHandler?: () => boolean };
-            if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
-        };
+            }, "resources:vn_assets");
+        }
     }, [currentPage, memoryView, prevMemoryView]);
 
     const handleSelectChar = (charId: string) => {

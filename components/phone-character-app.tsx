@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import type { Character } from "@/lib/character-types";
 import {
   createCharacter,
@@ -215,22 +216,14 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
     setView({ type: "list", id: null, isEditing: false });
   }
 
-  // 注册全局返回键处理器：角色管理内的详情/编辑视图优先自己消化；
-  // 退到列表主页才让桌面关闭整个应用。
+  // 角色详情/编辑视图各进一层导航栈
   useEffect(() => {
-    const canHandle = () => {
-      if (view.type === "detail") {
+    if (view.type === "detail") {
+      return pushNav(() => {
         setView({ type: "list", id: null, isEditing: false });
-        return true;
-      }
-      return false;
-    };
-    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
-    return () => {
-      const w = window as unknown as { __phoneBackHandler?: () => boolean };
-      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
-    };
-  }, [view]);
+      }, `character:${view.id || "new"}`);
+    }
+  }, [view.id, view.type]);
 
   return (
     <>
