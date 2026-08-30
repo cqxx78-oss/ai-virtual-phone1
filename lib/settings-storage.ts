@@ -653,7 +653,17 @@ export const DEFAULT_IMAGE_GENERATION_SETTINGS: ImageGenerationSettings = {
     },
 };
 
-
+function normalizeImageGenerationSettings(settings: Partial<ImageGenerationSettings>): ImageGenerationSettings {
+    return {
+        ...DEFAULT_IMAGE_GENERATION_SETTINGS,
+        ...settings,
+        imageHosting: {
+            ...DEFAULT_IMAGE_GENERATION_SETTINGS.imageHosting,
+            ...(settings.imageHosting || {}),
+        },
+        characterReferences: settings.characterReferences || {},
+    };
+}
 
 export function loadImageGenerationSettings(): ImageGenerationSettings {
     if (typeof window === "undefined") return { ...DEFAULT_IMAGE_GENERATION_SETTINGS };
