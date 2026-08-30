@@ -98,21 +98,17 @@ export function ApiSettings() {
     };
 
     // 拖拽排序逻辑
-    const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
-    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+    // 拖拽排序逻辑
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [dragOverId, setDragOverId] = useState<string | null>(null);
+    const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const touchStateRef = useRef<{
-        index: number;
+        id: string;
         startX: number;
         startY: number;
-        pointerId: number;
-        offsetX: number;
-        offsetY: number;
-        width: number;
-        height: number;
-        rect: DOMRect;
         activated: boolean;
     } | null>(null);
-    const draggingRef = useRef<number | null>(null);
+    const draggingIdRef = useRef<string | null>(null);
     const isTouchDragRef = useRef(false);
 
     const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
@@ -141,22 +137,28 @@ export function ApiSettings() {
             }
 
             if (isTouchDragRef.current) {
-                const draggedEl = document.querySelector(`[data-dragging-card="true"]`) as HTMLElement | null;
-                if (draggedEl) {
-                    draggedEl.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.05)`;
-                }
+                setDragOffset({ x: dx, y: dy });
 
                 // 隐藏被拖拽的卡片指针，以精确探测下方真实的卡槽
+                const draggedEl = document.querySelector(`[data-config-id="${draggingIdRef.current}"]`) as HTMLElement | null;
                 if (draggedEl) draggedEl.style.pointerEvents = "none";
                 const targetEl = document.elementFromPoint(clientX, clientY);
                 if (draggedEl) draggedEl.style.pointerEvents = "";
 
-                const cardEl = targetEl?.closest("[data-config-index]") as HTMLElement | null;
-                if (cardEl && !cardEl.hasAttribute("data-dragging-card")) {
-                    const hoverIdx = Number(cardEl.getAttribute("data-config-index"));
-                    if (!isNaN(hoverIdx) && draggingRef.current !== null && hoverIdx !== draggingRef.current) {
-                        handleReorder(draggingRef.current, hoverIdx);
-                        draggingRef.current = hoverIdx;
+                const cardEl = targetEl?.closest("[data-config-id]") as HTMLElement | null;
+                if (cardEl && draggingIdRef.current) {
+                    const hoverId = cardEl.getAttribute("data-config-id");
+                    if (hoverId && hoverId !== draggingIdRef.current) {
+                        setConfigs(prev => {
+                            const fromIdx = prev.findIndex(c => c.id === draggingIdRef.current);
+                            const toIdx = prev.findIndex(c => c.id === hoverId);
+                            if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+                            const next = [...prev];
+                            const [item] = next.splice(fromIdx, 1);
+                            next.splice(toIdx, 0, item);
+                            saveApiConfigs(next);
+                            return next;
+                        });
                         if (navigator.vibrate) navigator.vibrate(15);
                     }
                 }
@@ -178,20 +180,14 @@ export function ApiSettings() {
 
         const onUp = () => {
             if (touchStateRef.current && isTouchDragRef.current) {
-                const draggedEl = document.querySelector(`[data-dragging-card="true"]`) as HTMLElement | null;
-                if (draggedEl) {
-                    draggedEl.style.transform = "";
-                    draggedEl.removeAttribute("data-dragging-card");
-                }
-            }
-            if (touchStateRef.current && isTouchDragRef.current) {
                 document.body.style.overflow = "";
                 document.body.style.touchAction = "";
             }
             touchStateRef.current = null;
-            draggingRef.current = null;
-            setDraggingIndex(null);
-            setDragOverIndex(null);
+            draggingIdRef.current = null;
+            setDraggingId(null);
+            setDragOverId(null);
+            setDragOffset({ x: 0, y: 0 });
             isTouchDragRef.current = false;
         };
 
@@ -199,7 +195,6 @@ export function ApiSettings() {
         const onTouchCancel = () => onUp();
         const onMouseUp = () => onUp();
 
-        // 使用 document 监听 + passive: false,确保 preventDefault 生效
         document.addEventListener("touchmove", onTouchMove, { passive: false });
         document.addEventListener("touchend", onTouchEnd);
         document.addEventListener("touchcancel", onTouchCancel);
@@ -213,37 +208,23 @@ export function ApiSettings() {
             document.removeEventListener("mousemove", onMouseMove);
             document.removeEventListener("mouseup", onMouseUp);
         };
-    }, [handleReorder]);
+    }, []);
 
-    const startDrag = (index: number, clientX: number, clientY: number) => {
-        const el = document.querySelector(`[data-config-index="${index}"]`) as HTMLElement | null;
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
+    const startDrag = (id: string, clientX: number, clientY: number) => {
         touchStateRef.current = {
-            index,
+            id,
             startX: clientX,
             startY: clientY,
-            pointerId: -1,
-            offsetX: clientX - rect.left,
-            offsetY: clientY - rect.top,
-            width: rect.width,
-            height: rect.height,
-            rect,
             activated: true,
         };
         isTouchDragRef.current = false;
-        draggingRef.current = index;
+        draggingIdRef.current = id;
+        setDragOffset({ x: 0, y: 0 });
 
         setTimeout(() => {
-            if (touchStateRef.current && touchStateRef.current.index === index && touchStateRef.current.activated) {
+            if (touchStateRef.current && touchStateRef.current.id === id && touchStateRef.current.activated) {
                 isTouchDragRef.current = true;
-                setDraggingIndex(index);
-                const draggedEl = document.querySelector(`[data-config-index="${index}"]`) as HTMLElement | null;
-                if (draggedEl) {
-                    draggedEl.setAttribute("data-dragging-card", "true");
-                    draggedEl.style.zIndex = "1000";
-                    draggedEl.style.boxShadow = "0 12px 28px rgba(0,0,0,0.25)";
-                }
+                setDraggingId(id);
                 document.body.style.overflow = "hidden";
                 document.body.style.touchAction = "none";
                 if (navigator.vibrate) navigator.vibrate(40);
@@ -251,14 +232,14 @@ export function ApiSettings() {
         }, 350);
     };
 
-    const handleTouchStart = (index: number, e: React.TouchEvent) => {
+    const handleTouchStart = (id: string, e: React.TouchEvent) => {
         const touch = e.touches[0];
-        if (touch) startDrag(index, touch.clientX, touch.clientY);
+        if (touch) startDrag(id, touch.clientX, touch.clientY);
     };
 
-    const handleMouseDown = (index: number, e: React.MouseEvent) => {
+    const handleMouseDown = (id: string, e: React.MouseEvent) => {
         e.preventDefault();
-        startDrag(index, e.clientX, e.clientY);
+        startDrag(id, e.clientX, e.clientY);
     };
 
     const removeConfig = (id: string) => {
@@ -411,24 +392,28 @@ export function ApiSettings() {
                     </button>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-3">
-                    {configs.map((config, index) => {
-                        const isDragging = draggingIndex === index;
-                        const isDragOver = dragOverIndex === index;
+                <div className="grid grid-cols-2 gap-3 relative">
+                    {configs.map((config) => {
+                        const isDragging = draggingId === config.id;
                         return (
                             <div
                                 key={config.id}
-                                data-config-index={index}
-                                onMouseDown={(e) => handleMouseDown(index, e)}
-                                onTouchStart={(e) => handleTouchStart(index, e)}
+                                data-config-id={config.id}
+                                onMouseDown={(e) => handleMouseDown(config.id, e)}
+                                onTouchStart={(e) => handleTouchStart(config.id, e)}
                                 className={`ui-config-card min-w-0 cursor-pointer select-none transition-all ${
                                     isDragging
-                                        ? "opacity-50 ring-2 ring-black z-50"
-                                        : isDragOver
-                                            ? "ring-2 ring-black scale-98 bg-black/5"
-                                            : ""
+                                        ? "z-50 shadow-2xl scale-105 ring-2 ring-black bg-[var(--c-card-bg,white)]"
+                                        : ""
                                 }`}
-                                style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between", touchAction: "manipulation", transition: isDragging ? "none" : "transform 200ms ease, opacity 200ms ease, box-shadow 200ms ease" }}
+                                style={{
+                                    aspectRatio: "3 / 2",
+                                    padding: "12px",
+                                    justifyContent: "space-between",
+                                    touchAction: "manipulation",
+                                    transform: isDragging ? `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) scale(1.05)` : "none",
+                                    transition: isDragging ? "none" : "transform 200ms ease, box-shadow 200ms ease",
+                                }}
                                 role="button"
                                 tabIndex={0}
                                 aria-label={`编辑 ${config.name || config.provider}`}
