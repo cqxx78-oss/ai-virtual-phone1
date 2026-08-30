@@ -10,6 +10,7 @@ import {
 } from "@/lib/music-storage";
 import { useMusicControls, type MusicControlsValue } from "@/lib/music-context";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
+import { kvGet, kvSet, kvRemove } from "@/lib/kv-db";
 import {
     isNeteaseConfigured, loadMusicApiConfig, saveMusicApiConfig,
     searchNetease, getNeteasePlayInfo, getNeteaseLyrics, getNeteaseSongDetail,
@@ -1808,6 +1809,16 @@ function MusicSettingsTab({ onBack, onSaved }: { onBack: () => void; onSaved: ()
     // Custom background state (app pages + player each have their own image)
     const [bg, setBg] = useState<MusicBgConfig>(() => loadMusicBg());
     const [bgMsg, setBgMsg] = useState<string | null>(null);
+    const [floatEnabled, setFloatEnabled] = useState(() => kvGet("music-float-enabled") !== "false");
+
+    const toggleFloatEnabled = () => {
+        const next = !floatEnabled;
+        setFloatEnabled(next);
+        try {
+            kvSet("music-float-enabled", next ? "true" : "false");
+            window.dispatchEvent(new Event("music-float-setting-changed"));
+        } catch { /* ignore */ }
+    };
     const [bgUrlDraft, setBgUrlDraft] = useState(() => {
         const cfg = loadMusicBg();
         return cfg.image.startsWith("data:") ? "" : cfg.image;
@@ -2138,6 +2149,26 @@ function MusicSettingsTab({ onBack, onSaved }: { onBack: () => void; onSaved: ()
                     )}
                     {bgMsg && <div className="music-qr-status">{bgMsg}</div>}
                 </div>
+
+                {/* 桌面悬浮窗开关 */}
+                <div className="music-settings-section music-qr-section">
+                    <div className="music-settings-row" style={{ justifyContent: 'space-between' }}>
+                        <div>
+                            <div className="music-settings-label">桌面悬浮窗</div>
+                            <div className="music-settings-hint">在桌面上显示可拖动的迷你黑胶播放器</div>
+                        </div>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={floatEnabled}
+                            className="music-settings-toggle"
+                            {...(floatEnabled ? { "data-checked": "" } : {})}
+                            onClick={toggleFloatEnabled}
+                        >
+                            <span className="music-settings-toggle-thumb" />
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -2171,7 +2202,6 @@ function formatMusicCount(value: number): string {
 // ── CSS Editor ──
 import { MUSIC_CSS_EXAMPLE } from "@/lib/css-examples";
 import CSSSchemeBar from "@/components/ui/css-scheme-picker";
-import { kvGet, kvSet, kvRemove } from "@/lib/kv-db";
 
 function MusicCssEditor({ onClose, onSave }: { onClose: () => void; onSave: (css: string) => void }) {
     const [css, setCss] = useState(() => kvGet("music-custom-css") || "");
