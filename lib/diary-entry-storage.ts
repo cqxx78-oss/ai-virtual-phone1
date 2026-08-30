@@ -13,11 +13,15 @@ const ENTRIES_KEY = "ai_phone_diary_entries_v1";
 const TIMER_KEY = "ai_phone_diary_entry_timer_settings_v1";
 export const DIARY_ENTRY_FONT_ASSET_KEY = "ai_phone_diary_entry_font_asset_v1";
 export const DIARY_ENTRY_FONT_SCALE_KEY = "ai_phone_diary_entry_font_scale_v1";
+export const DIARY_ENTRY_CUSTOM_FONTS_KEY = "ai_phone_diary_entry_custom_fonts_v1";
+export const DIARY_ENTRY_CHARACTER_FONTS_KEY = "ai_phone_diary_entry_character_fonts_v1";
 
 registerKvMigration(ENTRIES_KEY);
 registerKvMigration(TIMER_KEY);
 registerKvMigration(DIARY_ENTRY_FONT_ASSET_KEY);
 registerKvMigration(DIARY_ENTRY_FONT_SCALE_KEY);
+registerKvMigration(DIARY_ENTRY_CUSTOM_FONTS_KEY);
+registerKvMigration(DIARY_ENTRY_CHARACTER_FONTS_KEY);
 
 function generateId(prefix: string): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return `${prefix}_${crypto.randomUUID()}`;
@@ -162,6 +166,61 @@ export function saveDiaryEntryFontScale(scale: number): void {
     return;
   }
   kvSet(DIARY_ENTRY_FONT_SCALE_KEY, String(normalized));
+}
+
+export type DiaryCustomFont = {
+  id: string;
+  name: string;
+  assetId: string;
+};
+
+export function loadDiaryCustomFonts(): DiaryCustomFont[] {
+  try {
+    const raw = kvGet(DIARY_ENTRY_CUSTOM_FONTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(item => item && typeof item === "object" && typeof item.id === "string" && typeof item.assetId === "string")
+      .map(item => ({
+        id: String(item.id).trim(),
+        name: String(item.name || "自定义字体").trim(),
+        assetId: String(item.assetId).trim(),
+      }))
+      .filter(item => item.id && item.assetId);
+  } catch {
+    return [];
+  }
+}
+
+export function saveDiaryCustomFonts(fonts: DiaryCustomFont[]): void {
+  try {
+    kvSet(DIARY_ENTRY_CUSTOM_FONTS_KEY, JSON.stringify(fonts));
+  } catch {}
+}
+
+export function loadDiaryCharacterFontMap(): Record<string, string> {
+  try {
+    const raw = kvGet(DIARY_ENTRY_CHARACTER_FONTS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const map: Record<string, string> = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      if (typeof val === "string" && val.trim()) {
+        map[key] = val.trim();
+      }
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export function saveDiaryCharacterFontMap(map: Record<string, string>): void {
+  try {
+    kvSet(DIARY_ENTRY_CHARACTER_FONTS_KEY, JSON.stringify(map));
+  } catch {}
 }
 
 export function normalizeDiaryEntry(raw: unknown): DiaryEntry | null {

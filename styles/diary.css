@@ -22,6 +22,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "NoteWall Chenyuluoyan";
+  src: url("/fonts/notewall/chen-yuluoyan-thin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 .diary-app,
 .note-wall-app {
   position: relative;
@@ -412,14 +420,132 @@
 }
 
 .diary-font-panel {
-  width: min(292px, calc(100vw - 58px));
+  width: min(340px, calc(100vw - 36px));
+  max-height: min(82vh, 640px);
+  overflow-y: auto;
   border-radius: 22px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.74)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.86)),
     #fffdf7;
   padding: 16px;
   color: #302d28;
   box-shadow: 0 14px 36px rgba(45, 36, 24, 0.16), 0 2px 5px rgba(45, 36, 24, 0.07);
+}
+
+.diary-font-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 14px;
+  background: rgba(48, 45, 40, 0.06);
+  padding: 3px;
+  border-radius: 12px;
+}
+
+.diary-font-tab-btn {
+  border: 0;
+  background: transparent;
+  border-radius: 9px;
+  padding: 6px 0;
+  font-size: calc(13px*var(--app-text-scale,1));
+  font-weight: 500;
+  color: rgba(48, 45, 40, 0.65);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.diary-font-tab-btn.is-active {
+  background: #ffffff;
+  color: #2b241c;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(45, 36, 24, 0.1);
+}
+
+.diary-font-character-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 0 0 1px rgba(80, 66, 48, 0.08);
+  margin-bottom: 8px;
+}
+
+.diary-font-character-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.diary-font-character-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(48, 45, 40, 0.08);
+}
+
+.diary-font-character-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.diary-font-character-name {
+  font-size: calc(13px*var(--app-text-scale,1));
+  font-weight: 550;
+  color: #2b241c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diary-font-select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(80, 66, 48, 0.16);
+  background: #ffffff;
+  color: #2b241c;
+  font-size: calc(12px*var(--app-text-scale,1));
+  outline: none;
+  max-width: 130px;
+}
+
+.diary-font-custom-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(80, 66, 48, 0.08);
+  margin-bottom: 6px;
+  font-size: calc(12px*var(--app-text-scale,1));
+}
+
+.diary-font-delete-btn {
+  border: 0;
+  background: transparent;
+  color: rgba(180, 50, 40, 0.75);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.diary-font-delete-btn:hover {
+  background: rgba(180, 50, 40, 0.1);
 }
 
 .diary-font-panel > header {

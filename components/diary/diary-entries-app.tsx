@@ -22,12 +22,24 @@ import {
   saveDiaryEntryFontAssetId,
   saveDiaryEntryFontScale,
   saveDiaryEntryTimerSettings,
+  loadDiaryCustomFonts,
+  saveDiaryCustomFonts,
+  loadDiaryCharacterFontMap,
+  saveDiaryCharacterFontMap,
+  type DiaryCustomFont,
 } from "@/lib/diary-entry-storage";
 import type { DiaryEntry, DiaryEntryBlock, DiaryEntryTimerSettings, DiaryEntryTrigger } from "@/lib/diary-entry-types";
 import { getThemeAssetDataUrl, saveThemeAssetFromBlob } from "@/lib/theme-storage";
 
-const DIARY_USER_FONT_FAMILY = "AIPhoneDiaryEntryUserFont";
 const DIARY_USER_FONT_STYLE_ID = "ai-phone-diary-entry-user-font-face";
+
+const PRESET_DIARY_FONTS = [
+  { id: "ximai", name: "喜脉体 (手写)", family: '"NoteWall Ximai", var(--app-font-family)' },
+  { id: "xiaozhitiao", name: "小纸条体 (手写)", family: '"NoteWall Xiaozhitiao", var(--app-font-family)' },
+  { id: "chenyuluoyan", name: "沉鱼落雁体 (手写细)", family: '"NoteWall Chenyuluoyan", var(--app-font-family)' },
+  { id: "huiwen", name: "汇文体 (印刷仿宋)", family: '"NoteWall Huiwen", var(--app-font-family)' },
+  { id: "system", name: "系统默认", family: 'var(--app-font-family)' },
+];
 
 type DiaryEntriesAppProps = {
   onBack: () => void;
@@ -125,8 +137,11 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
   const [activeCharacterId, setActiveCharacterId] = useState<string | null>(null);
   const [localGeneratingIds, setGeneratingCharacterIds] = useState<string[]>([]);
   const [diaryFontAssetId, setDiaryFontAssetId] = useState<string | null>(() => loadDiaryEntryFontAssetId());
-  const [diaryFontDataUrl, setDiaryFontDataUrl] = useState<string | null>(null);
   const [diaryFontScale, setDiaryFontScale] = useState<number>(() => loadDiaryEntryFontScale());
+  const [customFonts, setCustomFonts] = useState<DiaryCustomFont[]>(() => loadDiaryCustomFonts());
+  const [characterFontMap, setCharacterFontMap] = useState<Record<string, string>>(() => loadDiaryCharacterFontMap());
+  const [customFontUrls, setCustomFontUrls] = useState<Record<string, string>>({});
+
   // Merge in the module-level tracker so background generation (timer, or a
   // batch started before leaving the app) is visible again after re-entry.
   const trackedGeneratingIds = useDiaryGenerating();
@@ -152,29 +167,28 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
     setEntries(loadDiaryEntries());
   }, []);
 
+  // 加载并注入所有自定义上传的字体
   useEffect(() => {
-    if (!diaryFontAssetId) {
-      setDiaryFontDataUrl(null);
-      return;
-    }
     let cancelled = false;
-    void getThemeAssetDataUrl(diaryFontAssetId).then((dataUrl) => {
-      if (cancelled) return;
-      if (dataUrl) {
-        setDiaryFontDataUrl(dataUrl);
-        return;
+    const allAssetIds = new Set<string>();
+    if (diaryFontAssetId) allAssetIds.add(diaryFontAssetId);
+    customFonts.forEach(f => { if (f.assetId) allAssetIds.add(f.assetId); });
+
+    Promise.all(Array.from(allAssetIds).map(async (assetId) => {
+      try {
+        const dataUrl = await getThemeAssetDataUrl(assetId);
+        return { assetId, dataUrl };
+      } catch {
+        return { assetId, dataUrl: null };
       }
-      saveDiaryEntryFontAssetId(null);
-      setDiaryFontAssetId(null);
-      setDiaryFontDataUrl(null);
-      notify("日记字体资源丢失，已恢复默认字体");
-    }).catch(() => {
+    })).then((results) => {
       if (cancelled) return;
-      setDiaryFontDataUrl(null);
-      notify("日记字体加载失败，暂时使用默认字体");
+      const map: Record<string, string> = {};
+      results.forEach(r => { if (r.dataUrl) map[r.assetId] = r.dataUrl; });
+      setCustomFontUrls(map);
     });
     return () => { cancelled = true; };
-  }, [diaryFontAssetId, notify]);
+  }, [diaryFontAssetId, customFonts]);
 
   useEffect(() => {
     let node = document.getElementById(DIARY_USER_FONT_STYLE_ID) as HTMLStyleElement | null;
@@ -183,10 +197,17 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
       node.id = DIARY_USER_FONT_STYLE_ID;
       document.head.append(node);
     }
-    node.textContent = diaryFontDataUrl
-      ? `@font-face{font-family:"${DIARY_USER_FONT_FAMILY}";src:url("${diaryFontDataUrl}");font-display:swap;}`
-      : "";
-  }, [diaryFontDataUrl]);
+    const styleRules: string[] = [];
+    if (diaryFontAssetId && customFontUrls[diaryFontAssetId]) {
+      styleRules.push(`@font-face{font-family:"AIPhoneDiaryGlobalFont";src:url("${customFontUrls[diaryFontAssetId]}");font-display:swap;}`);
+    }
+    customFonts.forEach(f => {
+      if (f.assetId && customFontUrls[f.assetId]) {
+        styleRules.push(`@font-face{font-family:"AIPhoneDiaryFont_${f.id}";src:url("${customFontUrls[f.assetId]}");font-display:swap;}`);
+      }
+    });
+    node.textContent = styleRules.join("\n");
+  }, [diaryFontAssetId, customFonts, customFontUrls]);
 
   const handleDiaryFontUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -199,14 +220,21 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
       if (!dataUrl) {
         throw new Error("字体资源没有保存成功");
       }
-      saveDiaryEntryFontAssetId(assetId);
-      setDiaryFontAssetId(assetId);
-      setDiaryFontDataUrl(dataUrl);
-      notify(`日记字体已上传：${file.name}`);
+      const fontName = file.name.replace(/\.[^/.]+$/, "").slice(0, 16) || "自定义字体";
+      const newFont: DiaryCustomFont = {
+        id: `font_${Date.now()}`,
+        name: fontName,
+        assetId,
+      };
+      const nextFonts = [...customFonts, newFont];
+      setCustomFonts(nextFonts);
+      saveDiaryCustomFonts(nextFonts);
+      setCustomFontUrls(prev => ({ ...prev, [assetId]: dataUrl }));
+      notify(`已添加日记字体：${fontName}`);
     } catch (error) {
       notify("日记字体上传失败：" + String(error));
     }
-  }, [notify]);
+  }, [customFonts, notify]);
 
   const handleDiaryFontScaleChange = useCallback((scale: number) => {
     const normalized = Math.min(1.25, Math.max(0.85, scale));
@@ -214,23 +242,70 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
     saveDiaryEntryFontScale(normalized);
   }, []);
 
+  const handleCharacterFontChange = useCallback((characterId: string, fontId: string) => {
+    const nextMap = { ...characterFontMap, [characterId]: fontId };
+    if (!fontId || fontId === "default") {
+      delete nextMap[characterId];
+    }
+    setCharacterFontMap(nextMap);
+    saveDiaryCharacterFontMap(nextMap);
+  }, [characterFontMap]);
+
+  const handleDeleteCustomFont = useCallback((fontId: string) => {
+    const nextFonts = customFonts.filter(f => f.id !== fontId);
+    setCustomFonts(nextFonts);
+    saveDiaryCustomFonts(nextFonts);
+    const nextMap = { ...characterFontMap };
+    let changed = false;
+    Object.entries(nextMap).forEach(([cId, fId]) => {
+      if (fId === fontId) {
+        delete nextMap[cId];
+        changed = true;
+      }
+    });
+    if (changed) {
+      setCharacterFontMap(nextMap);
+      saveDiaryCharacterFontMap(nextMap);
+    }
+    notify("已删除该字体");
+  }, [customFonts, characterFontMap, notify]);
+
   const handleDiaryFontReset = useCallback(() => {
     saveDiaryEntryFontAssetId(null);
     saveDiaryEntryFontScale(1);
+    saveDiaryCharacterFontMap({});
     setDiaryFontAssetId(null);
-    setDiaryFontDataUrl(null);
     setDiaryFontScale(1);
-    notify("已恢复默认日记字体");
+    setCharacterFontMap({});
+    notify("已重置日记字体设置");
   }, [notify]);
+
+  const getFontFamilyForCharacter = useCallback((characterId?: string): string => {
+    const selectedFontId = characterId ? characterFontMap[characterId] : undefined;
+    if (selectedFontId) {
+      const preset = PRESET_DIARY_FONTS.find(p => p.id === selectedFontId);
+      if (preset) return preset.family;
+      const custom = customFonts.find(c => c.id === selectedFontId);
+      if (custom && customFontUrls[custom.assetId]) {
+        return `"AIPhoneDiaryFont_${custom.id}", "NoteWall Ximai", var(--app-font-family)`;
+      }
+    }
+    if (diaryFontAssetId && customFontUrls[diaryFontAssetId]) {
+      return '"AIPhoneDiaryGlobalFont", "NoteWall Ximai", var(--app-font-family)';
+    }
+    return '"NoteWall Ximai", var(--app-font-family)';
+  }, [characterFontMap, customFonts, customFontUrls, diaryFontAssetId]);
+
+  const activeCharacterFontFamily = useMemo(() => {
+    return getFontFamilyForCharacter(activeCharacterId || undefined);
+  }, [getFontFamilyForCharacter, activeCharacterId]);
 
   const diaryEntryStyle = useMemo(() => {
     return {
-      ...(diaryFontDataUrl
-        ? { "--diary-entry-font-family": `"${DIARY_USER_FONT_FAMILY}", "NoteWall Ximai", var(--app-font-family)` }
-        : {}),
+      "--diary-entry-font-family": activeCharacterFontFamily,
       "--diary-entry-font-scale": String(diaryFontScale),
     } as CSSProperties;
-  }, [diaryFontDataUrl, diaryFontScale]);
+  }, [activeCharacterFontFamily, diaryFontScale]);
 
   const deleteEntry = useCallback((entry: DiaryEntry) => {
     deleteDiaryEntry(entry.id);
@@ -674,6 +749,7 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
                     key={book.characterId}
                     book={book}
                     busy={generatingCharacterIds.includes(book.characterId)}
+                    fontFamily={getFontFamilyForCharacter(book.characterId)}
                     onOpen={() => setActiveCharacterId(book.characterId)}
                   />
                 ))}
@@ -724,17 +800,25 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
 
       {fontPanelOpen ? (
         <DiaryEntryFontPanel
-          hasCustomFont={Boolean(diaryFontDataUrl)}
+          characters={characters}
+          characterFontMap={characterFontMap}
+          customFonts={customFonts}
           scale={diaryFontScale}
           onUpload={() => fontFileRef.current?.click()}
           onScaleChange={handleDiaryFontScaleChange}
+          onCharacterFontChange={handleCharacterFontChange}
+          onDeleteCustomFont={handleDeleteCustomFont}
           onReset={handleDiaryFontReset}
           onClose={() => setFontPanelOpen(false)}
         />
       ) : null}
 
       {activeEntry ? (
-        <DiaryEntryDetail entry={activeEntry} onClose={() => setActiveEntry(null)} />
+        <DiaryEntryDetail
+          entry={activeEntry}
+          fontFamily={getFontFamilyForCharacter(activeEntry.characterId)}
+          onClose={() => setActiveEntry(null)}
+        />
       ) : null}
 
       {deleteCandidateEntry ? (
@@ -798,13 +882,20 @@ function hashText(value: string): number {
   return hash;
 }
 
-function DiaryBookCover({ book, busy, onOpen }: { book: DiaryBook; busy: boolean; onOpen: () => void }) {
+function DiaryBookCover({ book, busy, fontFamily, onOpen }: {
+  book: DiaryBook;
+  busy: boolean;
+  fontFamily?: string;
+  onOpen: () => void;
+}) {
   const hash = hashText(book.characterId);
   const latest = book.entries[0];
+  const coverStyle = fontFamily ? ({ "--diary-entry-font-family": fontFamily } as CSSProperties) : undefined;
   return (
     <button
       type="button"
       className="diary-book"
+      style={coverStyle}
       data-cover={hash % DIARY_BOOK_COVER_COUNT}
       onClick={onOpen}
     >
@@ -884,56 +975,141 @@ function DiaryEntryCard({
 }
 
 function DiaryEntryFontPanel({
-  hasCustomFont,
+  characters,
+  characterFontMap,
+  customFonts,
   scale,
   onUpload,
   onScaleChange,
+  onCharacterFontChange,
+  onDeleteCustomFont,
   onReset,
   onClose,
 }: {
-  hasCustomFont: boolean;
+  characters: Character[];
+  characterFontMap: Record<string, string>;
+  customFonts: DiaryCustomFont[];
   scale: number;
   onUpload: () => void;
   onScaleChange: (scale: number) => void;
+  onCharacterFontChange: (characterId: string, fontId: string) => void;
+  onDeleteCustomFont: (fontId: string) => void;
   onReset: () => void;
   onClose: () => void;
 }) {
+  const [tab, setTab] = useState<"character" | "manage">("character");
+
+  const allFontOptions = useMemo(() => {
+    const options: { id: string; name: string }[] = [
+      { id: "default", name: "默认喜脉手写" },
+      ...PRESET_DIARY_FONTS.map(p => ({ id: p.id, name: p.name })),
+      ...customFonts.map(c => ({ id: c.id, name: `${c.name} (自定义)` })),
+    ];
+    return options;
+  }, [customFonts]);
+
   return (
     <div className="nw-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
       <section className="diary-font-panel" onClick={event => event.stopPropagation()}>
         <header>
           <div>
-            <h2>日记字体</h2>
-            <p>{hasCustomFont ? "已使用自定义字体" : "当前使用默认手写字体"}</p>
+            <h2>日记字体设置</h2>
+            <p>为每个角色挑选专属手写字体</p>
           </div>
           <button type="button" className="diary-icon-btn" onClick={onClose} aria-label="关闭">
             <X size={18} />
           </button>
         </header>
 
-        <button type="button" className="diary-font-upload-action" onClick={onUpload}>
-          <span className="diary-font-upload-mark" aria-hidden="true">Aa</span>
-          <span>上传字体</span>
-        </button>
+        <div className="diary-font-tabs">
+          <button
+            type="button"
+            className={`diary-font-tab-btn ${tab === "character" ? "is-active" : ""}`}
+            onClick={() => setTab("character")}
+          >
+            角色字体分配
+          </button>
+          <button
+            type="button"
+            className={`diary-font-tab-btn ${tab === "manage" ? "is-active" : ""}`}
+            onClick={() => setTab("manage")}
+          >
+            字体库与字号
+          </button>
+        </div>
 
-        <label className="diary-font-size-control">
-          <span>
-            <strong>字号</strong>
-            <em>{Math.round(scale * 100)}%</em>
-          </span>
-          <input
-            type="range"
-            min="0.85"
-            max="1.25"
-            step="any"
-            value={scale}
-            onChange={event => onScaleChange(Number(event.target.value))}
-          />
-        </label>
+        {tab === "character" ? (
+          <div className="diary-font-character-list">
+            {characters.length === 0 ? (
+              <p style={{ textAlign: "center", color: "rgba(48,45,40,0.5)", margin: "20px 0", fontSize: "13px" }}>暂无角色</p>
+            ) : (
+              characters.map(character => (
+                <div key={character.id} className="diary-font-character-item">
+                  <div className="diary-font-character-info">
+                    <div className="diary-font-character-avatar">
+                      {character.avatar ? <img src={character.avatar} alt="" /> : <Bot size={16} />}
+                    </div>
+                    <span className="diary-font-character-name">{character.name}</span>
+                  </div>
+                  <select
+                    className="diary-font-select"
+                    value={characterFontMap[character.id] || "default"}
+                    onChange={e => onCharacterFontChange(character.id, e.target.value)}
+                  >
+                    {allFontOptions.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div>
+            <button type="button" className="diary-font-upload-action" onClick={onUpload}>
+              <span className="diary-font-upload-mark" aria-hidden="true">Aa</span>
+              <span>上传新字体文件 (.ttf/.woff2)</span>
+            </button>
 
-        <button type="button" className="diary-font-reset-btn" onClick={onReset}>
-          恢复默认
-        </button>
+            {customFonts.length > 0 && (
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: "rgba(48,45,40,0.7)", marginBottom: "6px" }}>已上传字体：</div>
+                {customFonts.map(font => (
+                  <div key={font.id} className="diary-font-custom-item">
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{font.name}</span>
+                    <button
+                      type="button"
+                      className="diary-font-delete-btn"
+                      title="删除字体"
+                      onClick={() => onDeleteCustomFont(font.id)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <label className="diary-font-size-control">
+              <span>
+                <strong>日记全局字号</strong>
+                <em>{Math.round(scale * 100)}%</em>
+              </span>
+              <input
+                type="range"
+                min="0.85"
+                max="1.25"
+                step="any"
+                value={scale}
+                onChange={event => onScaleChange(Number(event.target.value))}
+              />
+            </label>
+
+            <button type="button" className="diary-font-reset-btn" onClick={onReset}>
+              重置所有字体设置
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -1113,11 +1289,20 @@ function CharacterAvatarGrid({ characters, selectedIds, busyIds, disabled, onTog
   );
 }
 
-function DiaryEntryDetail({ entry, onClose }: { entry: DiaryEntry; onClose: () => void }) {
+function DiaryEntryDetail({
+  entry,
+  fontFamily,
+  onClose,
+}: {
+  entry: DiaryEntry;
+  fontFamily?: string;
+  onClose: () => void;
+}) {
   const markers = getEntryMarkers(entry);
+  const detailPaperStyle = fontFamily ? ({ "--diary-entry-font-family": fontFamily } as CSSProperties) : undefined;
   return (
     <div className="nw-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <article className="diary-entry-detail-paper" onClick={(event) => event.stopPropagation()}>
+      <article className="diary-entry-detail-paper" style={detailPaperStyle} onClick={(event) => event.stopPropagation()}>
         <span className="diary-entry-paper-clip" aria-hidden="true">
           <span />
         </span>
