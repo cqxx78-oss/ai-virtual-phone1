@@ -48,8 +48,10 @@ export default function MusicApp({ onClose }: Props) {
     // 分组 Tab：默认收藏；分组列表与自定义分类共同持久化
     const [activeCategory, setActiveCategory] = useState<CategoryTabId>("favorites");
     const [categories, setCategories] = useState<string[]>(() => loadCustomCategories());
-    const [showNewCategory, setShowNewCategory] = useState(false);
+    const [showCategoryManager, setShowCategoryManager] = useState(false);
+    const [managedCategory, setManagedCategory] = useState<string | null>(null);
     const [newCategoryName, setNewCategoryName] = useState("");
+    const [renameCategoryName, setRenameCategoryName] = useState("");
     const [showSettings, setShowSettings] = useState(false);
     const [showCssEditor, setShowCssEditor] = useState(false);
     const [customCss, setCustomCss] = useState("");
@@ -112,37 +114,24 @@ export default function MusicApp({ onClose }: Props) {
         return () => window.removeEventListener("music-library-updated", handleLibraryUpdated);
     }, []);
 
-    // 物理返回键 / 侧滑手势：在二级页面（每日推荐、歌单详情、设置弹窗等）时优先返回上一级，而非直接退出应用
+    // 音乐弹窗各进一层导航栈，避免直接覆盖全局返回处理器造成冲突
     useEffect(() => {
-        const prevHandler = (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler;
-        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = () => {
-            if (showSettings) {
-                setShowSettings(false);
-                return true;
-            }
-            if (showCssEditor) {
-                setShowCssEditor(false);
-                return true;
-            }
-            if (showNewCategory) {
-                setShowNewCategory(false);
-                return true;
-            }
-            if (dailyView) {
-                setDailyView(null);
-                return true;
-            }
-            if (activePlaylist) {
-                setActivePlaylist(null);
-                return true;
-            }
-            // 在主列表页，返回 false，让外层 DesktopShell 正常退出应用
-            return false;
-        };
-        return () => {
-            (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = prevHandler;
-        };
-    }, [showSettings, showCssEditor, showNewCategory, dailyView, activePlaylist]);
+        if (showSettings) {
+            return pushNav(() => setShowSettings(false), "music:settings");
+        }
+    }, [showSettings]);
+
+    useEffect(() => {
+        if (showCssEditor) {
+            return pushNav(() => setShowCssEditor(false), "music:cssEditor");
+        }
+    }, [showCssEditor]);
+
+    useEffect(() => {
+        if (showCategoryManager) {
+            return pushNav(() => setShowCategoryManager(false), "music:categoryManager");
+        }
+    }, [showCategoryManager]);
 
     const clearMusicToast = useCallback(() => {
         if (musicToastTimerRef.current) clearTimeout(musicToastTimerRef.current);
@@ -246,7 +235,6 @@ export default function MusicApp({ onClose }: Props) {
         setCategories(next);
         saveCustomCategories(next);
         setNewCategoryName("");
-        setShowNewCategory(false);
         setActiveCategory(name);
         showMusicToast(`已创建分组「${name}」`);
     };
@@ -259,12 +247,52 @@ export default function MusicApp({ onClose }: Props) {
         setCategories(next);
         saveCustomCategories(next);
         setTracks(prev => prev.map(t => t.category === catName ? { ...t, category: undefined } : t));
-        setActiveCategory("uncategorized");
+        if (activeCategory === catName) setActiveCategory("uncategorized");
+        if (managedCategory === catName) setManagedCategory(null);
         showMusicToast(`已删除分组「${catName}」`);
     };
 
-    const handleAssignCategory = async (trackId: string, catName: CategoryTabId) => {
-        const normalized = catName === "favorites" || catName === "uncategorized" ? undefined : catName;
+    const handleRenameCategory = (oldName: string) => {
+        const name = renameCategoryName.trim();
+        if (!name || name === oldName) return;
+        if (name === "收藏" || name === "未分组" || categories.includes(name)) {
+            showMusicToast("分类名已存在");
+            return;
+        }
+        const next = categories.map(c => c === oldName ? name : c);
+        setCategories(next);
+        saveCustomCategories(next);
+        setTracks(prev => prev.map(t => t.category === oldName ? { ...t, category: name } : t));
+        tracks.filter(t => t.category === oldName).forEach(t => {
+            void updateTrackMeta(t.id, { category: name });
+        });
+        if (activeCategory === oldName) setActiveCategory(name);
+        setManagedCategory(name);
+        setRenameCategoryName(name);
+        showMusicToast(`已重命名为「${name}」`);
+    };
+
+    const handleMoveCategory = (catName: string, direction: -1 | 1) => {
+        const index = categories.indexOf(catName);
+        const targetIndex = index + direction;
+        if (index < 0 || targetIndex < 0 || targetIndex >= categories.length) return;
+        const next = [...categories];
+        [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+        setCategories(next);
+        saveCustomCategories(next);
+    };
+
+    const openManagedCategory = (catName: string | null) => {
+        setManagedCategory(catName);
+        setRenameCategoryName(catName || "");
+    };
+
+    const handleManagerAssignTrack = async (trackId: string, catName: string | undefined) => {
+        await handleAssignCategory(trackId, catName);
+    };
+
+    const handleAssignCategory = async (trackId: string, catName?: CategoryTabId) => {
+        const normalized = !catName || catName === "favorites" || catName === "uncategorized" ? undefined : catName;
         await updateTrackMeta(trackId, { category: normalized });
         setTracks(prev => prev.map(t => t.id === trackId ? { ...t, category: normalized } : t));
         if (player.queue.some(t => t.id === trackId)) {
@@ -278,8 +306,6 @@ export default function MusicApp({ onClose }: Props) {
         if (activeCategory === "uncategorized") return tracks.filter(t => !t.category);
         return tracks.filter(t => t.category === activeCategory);
     }, [tracks, activeCategory]);
-
-    const isCustomCategoryActive = activeCategory !== "favorites" && activeCategory !== "uncategorized";
 
     /** Convert NeteaseSearchResult → MusicTrack */
     const toMusicTrack = useCallback((r: NeteaseSearchResult, extra?: { lyrics?: string; coverUrl?: string; name?: string; artists?: string }): MusicTrack => ({
@@ -426,6 +452,15 @@ export default function MusicApp({ onClose }: Props) {
                     {dailyView ? "每日推荐" : activePlaylist && tab === "recommend" ? "歌单详情" : tab === "recommend" ? "" : tab === "search" ? "搜索" : tab === "mine" ? "我的" : "本地音乐"}
                 </div>
                 <div className="music-header-right">
+                    {tab === "local" && (
+                        <button className="music-header-action" onClick={() => setShowCategoryManager(true)} title="分组管理">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h7l2 2h9v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                                <path d="M8 13h8" />
+                                <path d="M8 16h5" />
+                            </svg>
+                        </button>
+                    )}
                     <button className="music-header-action" onClick={() => setShowSettings(true)} title="设置">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -513,18 +548,6 @@ export default function MusicApp({ onClose }: Props) {
                                 {cat} <i>({tracks.filter(t => t.category === cat).length})</i>
                             </button>
                         ))}
-                        <button
-                            className="music-cat-tab music-cat-tab-add"
-                            title="新建分组"
-                            onClick={() => { setNewCategoryName(""); setShowNewCategory(true); }}
-                        >+</button>
-                        {isCustomCategoryActive && (
-                            <button
-                                className="music-cat-tab music-cat-tab-del"
-                                title="删除该分组"
-                                onClick={() => handleDeleteCategory(activeCategory)}
-                            >删除</button>
-                        )}
                     </div>
 
                     {/* Song list */}
@@ -661,35 +684,137 @@ export default function MusicApp({ onClose }: Props) {
             </div>
             </div>
 
-            {/* 新建分组弹窗 */}
-            {showNewCategory && (
-                <div className="music-settings-modal-overlay" onClick={() => setShowNewCategory(false)}>
-                    <div className="music-cat-modal-dialog" onClick={e => e.stopPropagation()}>
-                        <div className="music-cat-modal-header">
-                            <h2>新建音乐分组</h2>
-                            <button className="music-settings-close" onClick={() => setShowNewCategory(false)}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                            </button>
-                        </div>
-                        <div className="music-cat-modal-body" style={{ padding: '24px 20px 8px' }}>
-                            <div className="music-settings-label" style={{ marginBottom: 8 }}>分组名称</div>
-                            <input
-                                className="music-settings-input"
-                                style={{ height: 42, fontSize: 'calc(14px*var(--app-text-scale,1))' }}
-                                placeholder="例如：通勤路上、睡前听"
-                                value={newCategoryName}
-                                onChange={e => setNewCategoryName(e.target.value)}
-                                onKeyDown={e => e.key === "Enter" && handleCreateCategory()}
-                                autoFocus
-                            />
-                        </div>
-                        <div className="music-cat-modal-footer">
-                            <button className="music-settings-btn" onClick={() => setShowNewCategory(false)}>取消</button>
-                            <button className="music-settings-btn music-settings-btn-primary" onClick={handleCreateCategory}>创建</button>
+            {/* 分组管理弹窗 */}
+            {showCategoryManager && (() => {
+                const currentCat = managedCategory;
+                const catTracks = currentCat ? tracks.filter(t => t.category === currentCat) : [];
+                const availableTracks = currentCat ? tracks.filter(t => t.category !== currentCat) : [];
+
+                return (
+                    <div className="music-settings-modal-overlay" onClick={() => setShowCategoryManager(false)}>
+                        <div className="music-settings-modal-dialog music-category-manager-dialog" onClick={(e) => e.stopPropagation()}>
+                            <div className="music-settings-header">
+                                <button
+                                    className="music-settings-back"
+                                    style={{ visibility: currentCat ? 'visible' : 'hidden' }}
+                                    onClick={() => openManagedCategory(null)}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                                    返回
+                                </button>
+                                <h2>{currentCat ? "管理分组" : "分组管理"}</h2>
+                                <button className="music-settings-close" onClick={() => setShowCategoryManager(false)}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                </button>
+                            </div>
+
+                            {!currentCat ? (
+                                <div className="music-settings-body music-category-manager-body">
+                                    <div className="music-settings-section">
+                                        <div className="music-settings-label">新建分组</div>
+                                        <div className="music-settings-actions">
+                                            <input
+                                                className="music-settings-input"
+                                                placeholder="输入分组名称"
+                                                value={newCategoryName}
+                                                onChange={e => setNewCategoryName(e.target.value)}
+                                                onKeyDown={e => e.key === "Enter" && handleCreateCategory()}
+                                            />
+                                            <button className="music-settings-btn music-settings-btn-primary" style={{ flex: '0 0 76px' }} onClick={handleCreateCategory}>添加</button>
+                                        </div>
+                                    </div>
+
+                                    <div className="music-settings-section music-qr-section">
+                                        <div className="music-settings-label">分组列表</div>
+                                        <div className="music-settings-hint">可调整顺序、改名、删除分组；收藏和未分组为系统分组，不可编辑。</div>
+                                        <div className="music-category-manager-list">
+                                            <div className="music-category-manager-row" data-fixed="">
+                                                <div className="music-category-manager-main">
+                                                    <span className="music-category-manager-name">♥ 收藏</span>
+                                                    <span className="music-category-manager-count">{tracks.filter(t => t.liked).length} 首</span>
+                                                </div>
+                                                <span className="music-category-manager-badge">系统</span>
+                                            </div>
+                                            <div className="music-category-manager-row" data-fixed="">
+                                                <div className="music-category-manager-main">
+                                                    <span className="music-category-manager-name">未分组</span>
+                                                    <span className="music-category-manager-count">{tracks.filter(t => !t.category).length} 首</span>
+                                                </div>
+                                                <span className="music-category-manager-badge">系统</span>
+                                            </div>
+                                            {categories.length === 0 ? (
+                                                <div className="music-category-manager-empty">还没有自定义分组</div>
+                                            ) : categories.map((cat, idx) => (
+                                                <div key={cat} className="music-category-manager-row">
+                                                    <button className="music-category-manager-main" onClick={() => openManagedCategory(cat)}>
+                                                        <span className="music-category-manager-name">{cat}</span>
+                                                        <span className="music-category-manager-count">{tracks.filter(t => t.category === cat).length} 首</span>
+                                                    </button>
+                                                    <div className="music-category-manager-actions">
+                                                        <button title="上移" disabled={idx === 0} onClick={() => handleMoveCategory(cat, -1)}>↑</button>
+                                                        <button title="下移" disabled={idx === categories.length - 1} onClick={() => handleMoveCategory(cat, 1)}>↓</button>
+                                                        <button title="删除" onClick={() => handleDeleteCategory(cat)}>删</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="music-settings-body music-category-manager-body">
+                                    <div className="music-settings-section">
+                                        <div className="music-settings-label">分组名称</div>
+                                        <div className="music-settings-actions">
+                                            <input
+                                                className="music-settings-input"
+                                                value={renameCategoryName}
+                                                onChange={e => setRenameCategoryName(e.target.value)}
+                                                onKeyDown={e => e.key === "Enter" && handleRenameCategory(currentCat)}
+                                            />
+                                            <button className="music-settings-btn music-settings-btn-primary" style={{ flex: '0 0 76px' }} onClick={() => handleRenameCategory(currentCat)}>保存</button>
+                                        </div>
+                                    </div>
+
+                                    <div className="music-settings-section music-qr-section">
+                                        <div className="music-settings-label">分组内歌曲</div>
+                                        <div className="music-category-track-list">
+                                            {catTracks.length === 0 ? (
+                                                <div className="music-category-manager-empty">这个分组还没有歌曲</div>
+                                            ) : catTracks.map(t => (
+                                                <div key={t.id} className="music-category-track-row">
+                                                    <div className="music-category-track-info">
+                                                        <span>{t.title}</span>
+                                                        <small>{t.artist || "未知歌手"}</small>
+                                                    </div>
+                                                    <button onClick={() => void handleManagerAssignTrack(t.id, undefined)}>移出</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="music-settings-section music-qr-section">
+                                        <div className="music-settings-label">添加音乐</div>
+                                        <div className="music-settings-hint">从其它分组或未分组里添加到「{currentCat}」。</div>
+                                        <div className="music-category-track-list">
+                                            {availableTracks.length === 0 ? (
+                                                <div className="music-category-manager-empty">没有可添加的歌曲</div>
+                                            ) : availableTracks.map(t => (
+                                                <div key={t.id} className="music-category-track-row">
+                                                    <div className="music-category-track-info">
+                                                        <span>{t.title}</span>
+                                                        <small>{t.artist || "未知歌手"}</small>
+                                                    </div>
+                                                    <button onClick={() => void handleManagerAssignTrack(t.id, currentCat)}>添加</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()} 
 
             {/* Settings Modal */}
             {showSettings && (
