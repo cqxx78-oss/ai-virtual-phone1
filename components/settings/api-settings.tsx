@@ -146,10 +146,13 @@ export function ApiSettings() {
                     draggedEl.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.05)`;
                 }
 
-                // 计算当前手指中心点对应的目标卡槽索引
+                // 隐藏被拖拽的卡片指针，以精确探测下方真实的卡槽
+                if (draggedEl) draggedEl.style.pointerEvents = "none";
                 const targetEl = document.elementFromPoint(clientX, clientY);
+                if (draggedEl) draggedEl.style.pointerEvents = "";
+
                 const cardEl = targetEl?.closest("[data-config-index]") as HTMLElement | null;
-                if (cardEl) {
+                if (cardEl && !cardEl.hasAttribute("data-dragging-card")) {
                     const hoverIdx = Number(cardEl.getAttribute("data-config-index"));
                     if (!isNaN(hoverIdx) && draggingRef.current !== null && hoverIdx !== draggingRef.current) {
                         handleReorder(draggingRef.current, hoverIdx);
