@@ -16,7 +16,6 @@ import {
 } from "@/lib/music-service";
 import {
     loadAllTracks, updateTrackMeta, toggleLike,
-    loadCustomCategories, saveCustomCategories,
     type MusicTrack,
 } from "@/lib/music-storage";
 import MusicCommentsPage from "./music-comments";
@@ -73,15 +72,9 @@ export default function MusicPlayer() {
     const [showQueue, setShowQueue] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [allLocalTracks, setAllLocalTracks] = useState<MusicTrack[]>([]);
-    const [categories, setCategories] = useState<string[]>(() => loadCustomCategories());
-    const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all"); // "favorites" | "uncategorized" | category_name
-    const [showAddTrackModal, setShowAddTrackModal] = useState(false);
-    const [newCategoryInput, setNewCategoryInput] = useState("");
-    const [showNewCatDialog, setShowNewCatDialog] = useState(false);
 
     const refreshLocalData = useCallback(() => {
         loadAllTracks().then(setAllLocalTracks);
-        setCategories(loadCustomCategories());
     }, []);
 
     useEffect(() => {
@@ -677,146 +670,47 @@ export default function MusicPlayer() {
                 </button>
             </div>
 
-            {/* Category Playlists Center Modal */}
+            {/* 当前播放歌曲所属分组的播放列表（中央弹窗，只读，固定顺序） */}
             {showQueue && (() => {
-                let displayedTracks: MusicTrack[] = [];
-                if (activeCategoryTab === "favorites") {
-                    displayedTracks = allLocalTracks.filter(t => t.liked);
-                } else if (activeCategoryTab === "uncategorized") {
-                    displayedTracks = allLocalTracks.filter(t => !t.category);
-                } else {
-                    displayedTracks = allLocalTracks.filter(t => t.category === activeCategoryTab);
+                if (isNeteaseTrack) {
+                    return (
+                        <div className="music-settings-modal-overlay" onClick={() => setShowQueue(false)}>
+                            <div className="music-settings-modal-dialog" style={{ maxWidth: 320, padding: 20 }} onClick={e => e.stopPropagation()}>
+                                <div style={{ fontSize: 'calc(13px*var(--app-text-scale,1))', color: 'var(--c-music-text)', textAlign: 'center' }}>
+                                    网易云歌曲不在本地分组中
+                                </div>
+                                <div style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', color: 'var(--c-music-accent)', textAlign: 'center', marginTop: 8 }}>
+                                    请在主界面切换到「本地」标签查看分组
+                                </div>
+                                <div className="music-settings-actions" style={{ justifyContent: 'center', marginTop: 16 }}>
+                                    <button className="music-settings-btn music-settings-btn-primary" onClick={() => setShowQueue(false)}>知道了</button>
+                                </div>
+                            </div>
+                        </div>
+                    );
                 }
 
-                const handleCreateCategory = () => {
-                    const name = newCategoryInput.trim();
-                    if (!name) return;
-                    if (categories.includes(name) || name === "收藏" || name === "未分组") {
-                        showMusicToast("分类名已存在");
-                        return;
-                    }
-                    const next = [...categories, name];
-                    setCategories(next);
-                    saveCustomCategories(next);
-                    setActiveCategoryTab(name);
-                    setNewCategoryInput("");
-                    setShowNewCatDialog(false);
-                    showMusicToast(`已创建分类「${name}」`);
-                };
-
-                const handleDeleteCategory = (catName: string) => {
-                    allLocalTracks.filter(t => t.category === catName).forEach(t => {
-                        void updateTrackMeta(t.id, { category: undefined });
-                    });
-                    const next = categories.filter(c => c !== catName);
-                    setCategories(next);
-                    saveCustomCategories(next);
-                    setActiveCategoryTab("uncategorized");
-                    refreshLocalData();
-                    showMusicToast(`已删除分类「${catName}」`);
-                };
-
-                const handleRemoveFromCategory = async (trackId: string, e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    await updateTrackMeta(trackId, { category: undefined });
-                    refreshLocalData();
-                    showMusicToast("已移出该分类");
-                };
-
-                const handleAddSelectedToCategory = async (trackId: string) => {
-                    await updateTrackMeta(trackId, { category: activeCategoryTab });
-                    refreshLocalData();
-                    setShowAddTrackModal(false);
-                    showMusicToast("已添加到分类");
-                };
-
-                const uncategorizedList = allLocalTracks.filter(t => !t.category);
-                const isCustomCategory = activeCategoryTab !== "favorites" && activeCategoryTab !== "uncategorized";
+                // 确定所属分组：收藏 > 未分组 > 自定义分类
+                const cat = track.category;
+                const groupLabel = !cat ? "未分组" : cat;
+                const displayedTracks = !cat
+                    ? allLocalTracks.filter(t => !t.category)
+                    : allLocalTracks.filter(t => t.category === cat);
 
                 return (
-                    <div className="music-settings-modal-overlay" onClick={() => { setShowQueue(false); setShowAddTrackModal(false); }}>
+                    <div className="music-settings-modal-overlay" onClick={() => setShowQueue(false)}>
                         <div className="music-settings-modal-dialog" style={{ maxWidth: 350, maxHeight: '78vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-                            {/* Header */}
                             <div className="music-settings-header" style={{ padding: '16px 18px 10px' }}>
-                                <h2 style={{ fontSize: 'calc(14px*var(--app-text-scale,1))', fontWeight: 600 }}>播放列表与分组</h2>
+                                <h2 style={{ fontSize: 'calc(14px*var(--app-text-scale,1))', fontWeight: 600 }}>「{groupLabel}」分组</h2>
                                 <button className="music-settings-close" onClick={() => setShowQueue(false)}>
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                                 </button>
                             </div>
 
-                            {/* Category Horizontal Tabs */}
-                            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '4px 16px 8px', borderBottom: '1px solid var(--c-music-surface-solid)', flexShrink: 0, scrollbarWidth: 'none' }}>
-                                <button
-                                    className="music-settings-btn"
-                                    style={{
-                                        flex: 'none', height: 28, padding: '0 12px', borderRadius: 999, fontSize: 'calc(11px*var(--app-text-scale,1))',
-                                        background: activeCategoryTab === "favorites" ? 'var(--c-music-primary)' : 'var(--c-music-surface)',
-                                        color: activeCategoryTab === "favorites" ? '#fff' : 'var(--c-music-text)',
-                                    }}
-                                    onClick={() => setActiveCategoryTab("favorites")}
-                                >
-                                    ♥ 收藏 ({allLocalTracks.filter(t => t.liked).length})
-                                </button>
-                                <button
-                                    className="music-settings-btn"
-                                    style={{
-                                        flex: 'none', height: 28, padding: '0 12px', borderRadius: 999, fontSize: 'calc(11px*var(--app-text-scale,1))',
-                                        background: activeCategoryTab === "uncategorized" ? 'var(--c-music-text)' : 'var(--c-music-surface)',
-                                        color: activeCategoryTab === "uncategorized" ? 'var(--c-music-bg)' : 'var(--c-music-text)',
-                                    }}
-                                    onClick={() => setActiveCategoryTab("uncategorized")}
-                                >
-                                    未分组 ({allLocalTracks.filter(t => !t.category).length})
-                                </button>
-                                {categories.map(cat => (
-                                    <button
-                                        key={cat}
-                                        className="music-settings-btn"
-                                        style={{
-                                            flex: 'none', height: 28, padding: '0 12px', borderRadius: 999, fontSize: 'calc(11px*var(--app-text-scale,1))',
-                                            background: activeCategoryTab === cat ? 'var(--c-music-text)' : 'var(--c-music-surface)',
-                                            color: activeCategoryTab === cat ? 'var(--c-music-bg)' : 'var(--c-music-text)',
-                                        }}
-                                        onClick={() => setActiveCategoryTab(cat)}
-                                    >
-                                        {cat} ({allLocalTracks.filter(t => t.category === cat).length})
-                                    </button>
-                                ))}
-                                <button
-                                    className="music-settings-btn"
-                                    style={{ flex: 'none', width: 28, height: 28, borderRadius: '50%', padding: 0, fontSize: 'calc(13px*var(--app-text-scale,1))', display: 'grid', placeItems: 'center' }}
-                                    title="新建分组"
-                                    onClick={() => setShowNewCatDialog(true)}
-                                >
-                                    +
-                                </button>
-                            </div>
-
-                            {/* Sub Toolbar for custom categories */}
-                            {isCustomCategory && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px 4px', flexShrink: 0 }}>
-                                    <button
-                                        className="music-settings-btn"
-                                        style={{ height: 26, padding: '0 10px', fontSize: 'calc(10.5px*var(--app-text-scale,1))', borderRadius: 6 }}
-                                        onClick={() => setShowAddTrackModal(true)}
-                                    >
-                                        + 添加歌曲
-                                    </button>
-                                    <button
-                                        className="music-settings-btn music-settings-btn-danger"
-                                        style={{ height: 26, padding: '0 10px', fontSize: 'calc(10.5px*var(--app-text-scale,1))', borderRadius: 6 }}
-                                        onClick={() => handleDeleteCategory(activeCategoryTab)}
-                                    >
-                                        删除该分组
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Track List */}
                             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 {displayedTracks.length === 0 ? (
                                     <div style={{ padding: '36px 0', textAlign: 'center', color: 'var(--c-music-accent)', fontSize: 'calc(11.5px*var(--app-text-scale,1))' }}>
-                                        暂无歌曲{isCustomCategory ? '，点击上方「+ 添加歌曲」从「未分组」中添加' : ''}
+                                        这个分组还没有歌曲
                                     </div>
                                 ) : (
                                     displayedTracks.map((t, idx) => {
@@ -847,73 +741,11 @@ export default function MusicPlayer() {
                                                         {[0, 1, 2].map(i => <span key={i} className="music-wave-bar" style={{ animationDelay: `${i * 0.15}s` }} />)}
                                                     </div>
                                                 )}
-                                                {isCustomCategory && (
-                                                    <button
-                                                        style={{ border: 'none', background: 'none', padding: 4, cursor: 'pointer', color: 'var(--c-music-accent)' }}
-                                                        title="移出此分组"
-                                                        onClick={(e) => void handleRemoveFromCategory(t.id, e)}
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                )}
                                             </div>
                                         );
                                     })
                                 )}
                             </div>
-
-                            {/* Add track from Uncategorized modal */}
-                            {showAddTrackModal && (
-                                <div className="music-settings-modal-overlay" style={{ zIndex: 120 }} onClick={() => setShowAddTrackModal(false)}>
-                                    <div className="music-settings-modal-dialog" style={{ maxWidth: 300, maxHeight: '60vh' }} onClick={e => e.stopPropagation()}>
-                                        <div className="music-settings-header" style={{ padding: '12px 16px' }}>
-                                            <h2 style={{ fontSize: 'calc(13px*var(--app-text-scale,1))' }}>从「未分组」添加歌曲</h2>
-                                            <button className="music-settings-close" onClick={() => setShowAddTrackModal(false)}>✕</button>
-                                        </div>
-                                        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                            {uncategorizedList.length === 0 ? (
-                                                <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--c-music-accent)', fontSize: 11 }}>未分组中没有可用歌曲</div>
-                                            ) : (
-                                                uncategorizedList.map(t => (
-                                                    <div
-                                                        key={t.id}
-                                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', borderRadius: 8, background: 'var(--c-music-surface)', cursor: 'pointer' }}
-                                                        onClick={() => void handleAddSelectedToCategory(t.id)}
-                                                    >
-                                                        <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
-                                                            <div style={{ fontSize: 11.5, color: 'var(--c-music-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
-                                                            <div style={{ fontSize: 9.5, color: 'var(--c-music-accent)' }}>{t.artist}</div>
-                                                        </div>
-                                                        <span style={{ fontSize: 11, color: 'var(--c-music-primary)', fontWeight: 600 }}>+ 添加</span>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Create category dialog */}
-                            {showNewCatDialog && (
-                                <div className="music-settings-modal-overlay" style={{ zIndex: 130 }} onClick={() => setShowNewCatDialog(false)}>
-                                    <div className="music-settings-modal-dialog" style={{ maxWidth: 280, padding: 16 }} onClick={e => e.stopPropagation()}>
-                                        <div style={{ fontSize: 'calc(13px*var(--app-text-scale,1))', fontWeight: 600, color: 'var(--c-music-text)', marginBottom: 10 }}>新建音乐分组</div>
-                                        <input
-                                            className="music-settings-input"
-                                            style={{ height: 34, marginBottom: 12 }}
-                                            placeholder="输入分组名称"
-                                            value={newCategoryInput}
-                                            onChange={e => setNewCategoryInput(e.target.value)}
-                                            onKeyDown={e => e.key === "Enter" && handleCreateCategory()}
-                                            autoFocus
-                                        />
-                                        <div className="music-settings-actions">
-                                            <button className="music-settings-btn" onClick={() => setShowNewCatDialog(false)}>取消</button>
-                                            <button className="music-settings-btn music-settings-btn-primary" onClick={handleCreateCategory}>确定</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 );
