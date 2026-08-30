@@ -13,6 +13,7 @@ export type MusicTrack = {
     liked: boolean;
     addedAt: string;         // ISO timestamp
     lastPlayedAt?: string;   // ISO timestamp
+    category?: string;       // 自定义分类名，缺省属于未分组
 };
 
 // ── IndexedDB Setup ──
@@ -150,4 +151,24 @@ export function getAudioDuration(blob: Blob): Promise<number> {
         });
         audio.src = URL.createObjectURL(blob);
     });
+}
+
+// ── Custom Categories Storage ──
+const MUSIC_CATEGORIES_KEY = "ai_phone_music_custom_categories_v1";
+
+export function loadCustomCategories(): string[] {
+    if (typeof window === "undefined") return [];
+    try {
+        const raw = localStorage.getItem(MUSIC_CATEGORIES_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch { return []; }
+}
+
+export function saveCustomCategories(categories: string[]): void {
+    if (typeof window === "undefined") return;
+    try {
+        localStorage.setItem(MUSIC_CATEGORIES_KEY, JSON.stringify(categories));
+    } catch { /* ignore */ }
 }

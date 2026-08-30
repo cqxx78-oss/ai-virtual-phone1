@@ -2991,7 +2991,7 @@
 
 .mp-lumen {
     background-image: none;
-    background-color: #07080d;
+    background-color: #f8f9fa;
 }
 
 .mp-ambient {
@@ -3290,13 +3290,13 @@
 }
 
 .mp-wave i[data-lit] {
-    background: rgba(240, 248, 255, 0.85);
-    box-shadow: 0 0 6px rgba(200, 224, 255, 0.7);
+    background: #1f2329;
+    box-shadow: none;
 }
 
 .mp-wave i[data-head] {
-    background: #fff;
-    box-shadow: 0 0 10px rgba(230, 242, 255, 0.95), 0 0 20px rgba(160, 195, 255, 0.7);
+    background: var(--c-music-primary);
+    box-shadow: 0 0 8px rgba(255, 71, 87, 0.5);
 }
 
 .mp-times {
@@ -3338,10 +3338,10 @@
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: #fff;
-    color: #10131c;
+    background: #1f2329;
+    color: #fff;
     border: none;
-    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.14);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3351,8 +3351,8 @@
 
 .mp-ctrl-play:active {
     transform: scale(0.94);
-    color: #10131c;
-    background: #fff;
+    color: #fff;
+    background: #1f2329;
 }
 
 /* Social row */
