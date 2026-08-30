@@ -101,11 +101,15 @@ export function ApiSettings() {
     // 拖拽排序逻辑
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [dragOverId, setDragOverId] = useState<string | null>(null);
-    const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
     const touchStateRef = useRef<{
         id: string;
         startX: number;
         startY: number;
+        grabOffsetX: number;
+        grabOffsetY: number;
+        width: number;
+        height: number;
         activated: boolean;
     } | null>(null);
     const draggingIdRef = useRef<string | null>(null);
@@ -137,13 +141,12 @@ export function ApiSettings() {
             }
 
             if (isTouchDragRef.current) {
-                setDragOffset({ x: dx, y: dy });
+                setDragPos({ x: clientX - state.grabOffsetX, y: clientY - state.grabOffsetY });
 
-                // 隐藏被拖拽的卡片指针，以精确探测下方真实的卡槽
-                const draggedEl = document.querySelector(`[data-config-id="${draggingIdRef.current}"]`) as HTMLElement | null;
-                if (draggedEl) draggedEl.style.pointerEvents = "none";
+                // 隐藏被拖拽的浮层，以精确探测下方真实的卡槽位置
+                const ghostEl = document.getElementById("api-drag-ghost");
+                if (ghostEl) ghostEl.style.pointerEvents = "none";
                 const targetEl = document.elementFromPoint(clientX, clientY);
-                if (draggedEl) draggedEl.style.pointerEvents = "";
 
                 const cardEl = targetEl?.closest("[data-config-id]") as HTMLElement | null;
                 if (cardEl && draggingIdRef.current) {
@@ -187,7 +190,7 @@ export function ApiSettings() {
             draggingIdRef.current = null;
             setDraggingId(null);
             setDragOverId(null);
-            setDragOffset({ x: 0, y: 0 });
+            setDragPos(null);
             isTouchDragRef.current = false;
         };
 
@@ -211,20 +214,30 @@ export function ApiSettings() {
     }, []);
 
     const startDrag = (id: string, clientX: number, clientY: number) => {
+        const el = document.querySelector(`[data-config-id="${id}"]`) as HTMLElement | null;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
         touchStateRef.current = {
             id,
             startX: clientX,
             startY: clientY,
+            grabOffsetX: clientX - rect.left,
+            grabOffsetY: clientY - rect.top,
+            width: rect.width,
+            height: rect.height,
             activated: true,
         };
         isTouchDragRef.current = false;
         draggingIdRef.current = id;
-        setDragOffset({ x: 0, y: 0 });
 
         setTimeout(() => {
             if (touchStateRef.current && touchStateRef.current.id === id && touchStateRef.current.activated) {
                 isTouchDragRef.current = true;
                 setDraggingId(id);
+                setDragPos({
+                    x: touchStateRef.current.startX - touchStateRef.current.grabOffsetX,
+                    y: touchStateRef.current.startY - touchStateRef.current.grabOffsetY,
+                });
                 document.body.style.overflow = "hidden";
                 document.body.style.touchAction = "none";
                 if (navigator.vibrate) navigator.vibrate(40);
@@ -402,17 +415,14 @@ export function ApiSettings() {
                                 onMouseDown={(e) => handleMouseDown(config.id, e)}
                                 onTouchStart={(e) => handleTouchStart(config.id, e)}
                                 className={`ui-config-card min-w-0 cursor-pointer select-none transition-all ${
-                                    isDragging
-                                        ? "z-50 shadow-2xl scale-105 ring-2 ring-black bg-[var(--c-card-bg,white)]"
-                                        : ""
+                                    isDragging ? "opacity-30 border-dashed border-2 border-black/40 scale-95" : ""
                                 }`}
                                 style={{
                                     aspectRatio: "3 / 2",
                                     padding: "12px",
                                     justifyContent: "space-between",
                                     touchAction: "manipulation",
-                                    transform: isDragging ? `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) scale(1.05)` : "none",
-                                    transition: isDragging ? "none" : "transform 200ms ease, box-shadow 200ms ease",
+                                    transition: "transform 200ms ease, opacity 200ms ease",
                                 }}
                                 role="button"
                                 tabIndex={0}
@@ -461,6 +471,37 @@ export function ApiSettings() {
                             </div>
                         );
                     })}
+
+                    {/* 拖拽中的跟随悬浮卡片 (Portal Ghost) */}
+                    {draggingId && dragPos && touchStateRef.current && (() => {
+                        const draggedConfig = configs.find(c => c.id === draggingId);
+                        if (!draggedConfig) return null;
+                        return (
+                            <div
+                                id="api-drag-ghost"
+                                className="ui-config-card pointer-events-none fixed z-[9999] shadow-2xl ring-2 ring-black bg-[var(--c-card-bg,white)] scale-105"
+                                style={{
+                                    left: `${dragPos.x}px`,
+                                    top: `${dragPos.y}px`,
+                                    width: `${touchStateRef.current.width}px`,
+                                    height: `${touchStateRef.current.height}px`,
+                                    padding: "12px",
+                                    justifyContent: "space-between",
+                                    borderRadius: "16px",
+                                    margin: 0,
+                                }}
+                            >
+                                <div className="min-w-0 flex flex-col gap-1">
+                                    <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">{draggedConfig.name || draggedConfig.provider}</span>
+                                    <span className="menu-desc truncate">{draggedConfig.defaultModel || draggedConfig.provider || "未设置模型"}</span>
+                                </div>
+                                <div className="flex gap-2 shrink-0 items-center justify-end opacity-60">
+                                    <FileEdit size={18} />
+                                    <Trash2 size={18} />
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 
