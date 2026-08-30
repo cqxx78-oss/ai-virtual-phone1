@@ -34,11 +34,9 @@ import { getThemeAssetDataUrl, saveThemeAssetFromBlob } from "@/lib/theme-storag
 const DIARY_USER_FONT_STYLE_ID = "ai-phone-diary-entry-user-font-face";
 
 const PRESET_DIARY_FONTS = [
+  { id: "system", name: "系统默认", family: 'var(--app-font-family)' },
   { id: "ximai", name: "喜脉体 (手写)", family: '"NoteWall Ximai", var(--app-font-family)' },
   { id: "xiaozhitiao", name: "小纸条体 (手写)", family: '"NoteWall Xiaozhitiao", var(--app-font-family)' },
-  { id: "chenyuluoyan", name: "沉鱼落雁体 (手写细)", family: '"NoteWall Chenyuluoyan", var(--app-font-family)' },
-  { id: "huiwen", name: "汇文体 (印刷仿宋)", family: '"NoteWall Huiwen", var(--app-font-family)' },
-  { id: "system", name: "系统默认", family: 'var(--app-font-family)' },
 ];
 
 type DiaryEntriesAppProps = {
