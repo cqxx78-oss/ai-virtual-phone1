@@ -68,6 +68,8 @@ export default function MusicPlayer() {
         loadAllTracks().then(setAllLocalTracks);
     }, []);
 
+    const [artistView, setArtistView] = useState<{ id: number; name: string } | null>(null);
+
     useEffect(() => {
         if (showQueue) refreshLocalData();
     }, [showQueue, refreshLocalData]);
@@ -93,7 +95,6 @@ export default function MusicPlayer() {
             (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = prevHandler;
         };
     }, [player, showQueue, artistView]);
-    const [artistView, setArtistView] = useState<{ id: number; name: string } | null>(null);
     const [palette, setPalette] = useState<CoverPalette>(DEFAULT_COVER_PALETTE);
     const [bgCfg, setBgCfg] = useState<MusicBgConfig>(() => loadMusicBg());
 
