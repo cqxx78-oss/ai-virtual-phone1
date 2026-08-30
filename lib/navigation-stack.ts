@@ -15,7 +15,7 @@ function initGlobalPopStateListener() {
   if (typeof window === "undefined" || initialized) return;
   initialized = true;
 
-  window.addEventListener("popstate", (event) => {
+  window.addEventListener("popstate", () => {
     if (stack.length > 0) {
       const top = stack.pop();
       if (top) {
@@ -48,16 +48,21 @@ export function pushNav(onPop: () => void, tag?: string): () => void {
   } catch {}
 
   return () => {
-    // 如果当前不是因为用户物理返回/popstate 触发的卸载，而是组件自己卸载或手动关闭
+    // 如果是物理返回/popstate 触发的回调导致的组件卸载，栈顶已经在 popstate 事件里被 pop 掉了，无需重复处理
     if (!isNavigatingBack) {
       const idx = stack.findIndex(e => e.id === entryId);
       if (idx !== -1) {
+        // 只有当被手动关闭的是当前栈顶时，才调用 history.back() 弹出该历史条目
+        // 此时 history.back() 触发的 popstate 会因为栈里已经没有该 entry 而不会误触发额外的 onPop
+        const isTop = (idx === stack.length - 1);
         stack.splice(idx, 1);
-        // 只有当被移除的是当前栈顶时才调用 history.back() 弹出该历史条目
-        if (idx === stack.length) {
+        if (isTop) {
           try {
+            isNavigatingBack = true;
             window.history.back();
-          } catch {}
+          } catch {} finally {
+            isNavigatingBack = false;
+          }
         }
       }
     }
