@@ -1036,7 +1036,6 @@ function DiaryEntryFontPanel({
 
   const allFontOptions = useMemo(() => {
     const options: { id: string; name: string }[] = [
-      { id: "default", name: "默认喜脉手写" },
       ...PRESET_DIARY_FONTS.map(p => ({ id: p.id, name: p.name })),
       ...customFonts.map(c => ({ id: c.id, name: `${c.name} (自定义)` })),
     ];
@@ -1088,7 +1087,7 @@ function DiaryEntryFontPanel({
                   </div>
                   <select
                     className="diary-font-select"
-                    value={characterFontMap[character.id] || "default"}
+                    value={characterFontMap[character.id] || "ximai"}
                     onChange={e => onCharacterFontChange(character.id, e.target.value)}
                   >
                     {allFontOptions.map(opt => (
