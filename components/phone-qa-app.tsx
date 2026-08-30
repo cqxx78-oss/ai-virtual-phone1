@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExterna
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import { AppWindow, ArrowUp, BrushCleaning, Check, ChevronLeft, ChevronRight, Copy, Drama, Gamepad2, Github, Loader2, Menu, MoreVertical, Pencil, Pin, PinOff, Play, Plus, Square, Trash2, Wrench, X } from "lucide-react";
+import { AppWindow, ArrowDown, ArrowUp, BrushCleaning, Check, ChevronLeft, ChevronRight, Copy, Drama, Gamepad2, Github, Loader2, Menu, MoreVertical, Pencil, Pin, PinOff, Play, Plus, Square, Trash2, Wrench, X } from "lucide-react";
 import { QaFileCard } from "@/components/qa-file-card";
 import { parseQaFileMarker } from "@/lib/qa-computer-tools";
 import { mdiHammerWrench } from "@mdi/js";
@@ -812,6 +812,7 @@ export function PhoneQaApp({ onClose, onNotice }: PhoneQaAppProps) {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const stickToBottomRef = useRef(true);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   const refreshComposerMeta = useCallback(() => {
     setApiReady(resolveQaApiConfig() != null);
@@ -874,13 +875,27 @@ export function PhoneQaApp({ onClose, onNotice }: PhoneQaAppProps) {
   const handleScroll = useCallback(() => {
     const el = bodyRef.current;
     if (!el) return;
-    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceToBottom < 80;
+    setShowScrollBottom(distanceToBottom > 160);
+  }, []);
+
+  const scrollQaBodyToBottom = useCallback(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    stickToBottomRef.current = true;
+    setShowScrollBottom(false);
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    window.setTimeout(() => {
+      el.scrollTop = el.scrollHeight;
+    }, 240);
   }, []);
 
   useEffect(() => {
     const el = bodyRef.current;
     if (el && stickToBottomRef.current) {
       el.scrollTop = el.scrollHeight;
+      setShowScrollBottom(false);
     }
   }, [messages]);
 
@@ -1043,6 +1058,18 @@ export function PhoneQaApp({ onClose, onNotice }: PhoneQaAppProps) {
           </div>
         )}
       </div>
+
+      {showScrollBottom && messages.length > 0 && (
+        <button
+          type="button"
+          className="qa-scroll-bottom-btn"
+          onClick={scrollQaBodyToBottom}
+          aria-label="回到最新聊天记录"
+          title="回到最新"
+        >
+          <ArrowDown size={22} strokeWidth={2.4} />
+        </button>
+      )}
 
       <footer className="qa-composer-wrap">
         <div className={`qa-composer ${snapshot.isGenerating ? "is-generating" : ""}`}>
