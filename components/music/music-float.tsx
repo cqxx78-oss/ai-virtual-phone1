@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMusicControlsOptional } from "@/lib/music-context";
+import { kvGet } from "@/lib/kv-db";
 
 const DRAG_START_THRESHOLD = 6;
 const SWIPE_DISMISS_EDGE_X = 4;
@@ -13,6 +14,13 @@ const SWIPE_VELOCITY_RECENT_MS = 180;
 
 export default function MusicFloat({ hidden }: { hidden?: boolean }) {
     const player = useMusicControlsOptional();
+    const [enabled, setEnabled] = useState(() => typeof window !== "undefined" ? kvGet("music-float-enabled") !== "false" : true);
+
+    useEffect(() => {
+        const handleToggle = () => setEnabled(kvGet("music-float-enabled") !== "false");
+        window.addEventListener("music-float-setting-changed", handleToggle);
+        return () => window.removeEventListener("music-float-setting-changed", handleToggle);
+    }, []);
     const floatRef = useRef<HTMLDivElement>(null);
     const [pos, setPos] = useState({ x: 310, y: 680 });
     const dragRef = useRef<{
@@ -162,7 +170,7 @@ export default function MusicFloat({ hidden }: { hidden?: boolean }) {
     const handlePointerUp = useCallback((e: React.PointerEvent) => finishPointer(e), [finishPointer]);
     const handlePointerCancel = useCallback((e: React.PointerEvent) => finishPointer(e), [finishPointer]);
 
-    if (!player || !player.currentTrack || hidden || player.floatDismissed) return null;
+    if (!enabled || !player || !player.currentTrack || hidden || player.floatDismissed) return null;
 
     const track = player.currentTrack;
 

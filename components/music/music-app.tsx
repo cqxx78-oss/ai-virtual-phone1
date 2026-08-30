@@ -1183,8 +1183,7 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack 
     const handleCoverChange = async (files: FileList | null) => {
         if (!files || !files[0]) return;
         try {
-            // 高清原图无损优化：最大边 1080px，保持 0.95 高画质 JPEG
-            const dataUrl = await fileToCompressedDataUrl(files[0], 1080, 0.95);
+            const dataUrl = await fileToCompressedDataUrl(files[0], 400, 0.85);
             setEditCover(dataUrl);
         } catch { /* ignore */ }
         if (coverFileRef.current) coverFileRef.current.value = "";
@@ -1245,49 +1244,49 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack 
             {/* Edit modal */}
             {editingTrack && (
                 <div className="music-settings-modal-overlay" onClick={() => setEditingTrack(null)}>
-                    <div className="music-settings-modal-dialog" style={{ maxWidth: 360, maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
-                        <div className="music-settings-header" style={{ padding: '16px 20px 10px' }}>
+                    <div className="music-settings-modal-dialog" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+                        <div className="music-settings-header">
                             <h2>编辑歌曲信息</h2>
                             <button className="music-settings-close" onClick={() => setEditingTrack(null)}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                             </button>
                         </div>
-                        <div className="music-settings-body" style={{ maxHeight: 'calc(88vh - 65px)', overflowY: 'auto', gap: 12, paddingBottom: 20 }}>
-                            <div className="music-settings-section" style={{ gap: 6 }}>
+                        <div className="music-settings-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                            <div className="music-settings-section">
                                 <div className="music-settings-label">封面图片</div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
-                                    <div style={{ width: 48, height: 48, borderRadius: 10, overflow: 'hidden', background: 'var(--c-music-surface-solid)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                                    <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', background: 'var(--c-music-surface-solid)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         {editCover ? <img src={editCover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, color: 'var(--c-music-accent)' }}>无封面</span>}
                                     </div>
                                     <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={e => handleCoverChange(e.target.files)} />
-                                    <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '5px 12px', height: 32 }} onClick={() => coverFileRef.current?.click()}>
+                                    <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '6px 12px' }} onClick={() => coverFileRef.current?.click()}>
                                         更换封面
                                     </button>
                                     {editCover && (
-                                        <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '5px 12px', height: 32 }} onClick={() => setEditCover(undefined)}>
+                                        <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '6px 12px' }} onClick={() => setEditCover(undefined)}>
                                             移除
                                         </button>
                                     )}
                                 </div>
                             </div>
-                            <div className="music-settings-section" style={{ gap: 4 }}>
+                            <div className="music-settings-section">
                                 <div className="music-settings-label">歌曲名</div>
-                                <input className="music-settings-input" style={{ height: 34 }} value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="输入歌曲名" />
+                                <input className="music-settings-input" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="输入歌曲名" />
                             </div>
-                            <div className="music-settings-section" style={{ gap: 4 }}>
+                            <div className="music-settings-section">
                                 <div className="music-settings-label">歌手 / 艺术家</div>
-                                <input className="music-settings-input" style={{ height: 34 }} value={editArtist} onChange={e => setEditArtist(e.target.value)} placeholder="输入歌手名" />
+                                <input className="music-settings-input" value={editArtist} onChange={e => setEditArtist(e.target.value)} placeholder="输入歌手名" />
                             </div>
-                            <div className="music-settings-section" style={{ gap: 4 }}>
+                            <div className="music-settings-section">
                                 <div className="music-settings-label">专辑名称（可选）</div>
-                                <input className="music-settings-input" style={{ height: 34 }} value={editAlbum} onChange={e => setEditAlbum(e.target.value)} placeholder="输入专辑名" />
+                                <input className="music-settings-input" value={editAlbum} onChange={e => setEditAlbum(e.target.value)} placeholder="输入专辑名" />
                             </div>
-                            <div className="music-settings-section" style={{ gap: 4 }}>
+                            <div className="music-settings-section">
                                 <div className="music-settings-label">歌词（支持 LRC 格式或纯文本）</div>
-                                <div className="music-settings-hint" style={{ fontSize: 'calc(9px*var(--app-text-scale,1))' }}>粘贴形如 [00:12.34]歌词内容 的 LRC 歌词可实现滚动同步</div>
+                                <div className="music-settings-hint">粘贴形如 [00:12.34]歌词内容 的 LRC 歌词可实现滚动同步</div>
                                 <textarea
                                     className="music-settings-input"
-                                    style={{ height: 96, resize: 'vertical', fontFamily: 'monospace', fontSize: 'calc(11.5px*var(--app-text-scale,1))', lineHeight: 1.45, whiteSpace: 'pre-wrap', padding: '8px 10px' }}
+                                    style={{ height: 140, resize: 'vertical', fontFamily: 'monospace', fontSize: 'calc(12px*var(--app-text-scale,1))', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}
                                     value={editLyrics}
                                     onChange={e => setEditLyrics(e.target.value)}
                                     placeholder="[00:00.00]歌曲名
@@ -1295,7 +1294,7 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack 
 [00:08.50]第一句歌词..."
                                 />
                             </div>
-                            <div className="music-settings-actions" style={{ marginTop: 8 }}>
+                            <div className="music-settings-actions" style={{ marginTop: 16 }}>
                                 <button className="music-settings-btn" onClick={() => setEditingTrack(null)}>取消</button>
                                 <button className="music-settings-btn music-settings-btn-primary" onClick={handleSaveEdit}>保存修改</button>
                             </div>
@@ -1617,6 +1616,14 @@ function MusicSettingsTab({ onBack, onSaved }: { onBack: () => void; onSaved: ()
     const [config, setConfig] = useState<MusicApiConfig>(() => loadMusicApiConfig());
     const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
     const [testing, setTesting] = useState(false);
+    const [floatWidgetEnabled, setFloatWidgetEnabled] = useState(() => typeof window !== "undefined" ? kvGet("music-float-enabled") !== "false" : true);
+
+    const toggleFloatWidget = () => {
+        const next = !floatWidgetEnabled;
+        setFloatWidgetEnabled(next);
+        kvSet("music-float-enabled", next ? "true" : "false");
+        window.dispatchEvent(new CustomEvent("music-float-setting-changed"));
+    };
 
     // QR login state
     const [qrImg, setQrImg] = useState<string | null>(null);
@@ -1782,6 +1789,24 @@ function MusicSettingsTab({ onBack, onSaved }: { onBack: () => void; onSaved: ()
             </div>
 
             <div className="music-settings-body">
+                {/* Floating Widget Toggle */}
+                <div className="music-settings-section">
+                    <div className="music-settings-row">
+                        <div>
+                            <div className="music-settings-label">桌面悬浮黑胶胶囊</div>
+                            <div className="music-settings-hint">开启后，离开音乐 App 时在桌面显示悬浮控制球</div>
+                        </div>
+                        <button
+                            type="button"
+                            className="music-settings-toggle"
+                            {...(floatWidgetEnabled ? { "data-checked": "" } : {})}
+                            onClick={toggleFloatWidget}
+                        >
+                            <span className="music-settings-toggle-thumb" />
+                        </button>
+                    </div>
+                </div>
+
                 <div className="music-settings-section">
                     <div className="music-settings-label">网易云 API 地址</div>
                     <div className="music-settings-hint">默认使用公共服务，也可以改成自己的 NeteaseCloudMusicApi 地址</div>
