@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState, useEffect, useRef, useCallback } from "react";
-import { pushNav } from "@/lib/navigation-stack";
+import { pushNav, popNav } from "@/lib/navigation-stack";
 import { ChatMessageList } from "./chat-message-list";
 import { ChatContactsList } from "./chat-contacts-list";
 import { MomentsFeed } from "./moments-feed";
@@ -221,8 +221,8 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     }, [pendingAddContactId]);
 
     const handleRoomBack = useCallback(() => {
-        setActiveSession(null);
-        setActiveMascot(false);
+        // 统一使用 popNav() 驱动出栈，这样虚拟返回键和物理返回键 100% 走完全一致的调度通道
+        popNav();
     }, []);
 
     // Listen for CSS updates from settings panel

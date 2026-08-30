@@ -9,22 +9,23 @@ type NavEntry = {
 let nextId = 1;
 const stack: NavEntry[] = [];
 let initialized = false;
-let isNavigatingBack = false;
 
 function initGlobalPopStateListener() {
   if (typeof window === "undefined" || initialized) return;
   initialized = true;
 
-  window.addEventListener("popstate", () => {
-    if (stack.length > 0) {
-      const top = stack.pop();
-      if (top) {
-        try {
-          isNavigatingBack = true;
-          top.onPop();
-        } finally {
-          isNavigatingBack = false;
-        }
+  window.addEventListener("popstate", (event) => {
+    const navId = (event.state as { __navId?: number } | null)?.__navId;
+
+    if (stack.length === 0) return;
+
+    // 正常出栈：物理返回键回退到上一个历史条目
+    const top = stack.pop();
+    if (top) {
+      try {
+        top.onPop();
+      } catch (err) {
+        console.error("[NavStack] Error in onPop handler:", err);
       }
     }
   });
@@ -48,29 +49,20 @@ export function pushNav(onPop: () => void, tag?: string): () => void {
   } catch {}
 
   return () => {
-    // 如果是物理返回/popstate 触发的回调导致的组件卸载，栈顶已经在 popstate 事件里被 pop 掉了，无需重复处理
-    if (!isNavigatingBack) {
-      const idx = stack.findIndex(e => e.id === entryId);
-      if (idx !== -1) {
-        // 只有当被手动关闭的是当前栈顶时，才调用 history.back() 弹出该历史条目
-        // 此时 history.back() 触发的 popstate 会因为栈里已经没有该 entry 而不会误触发额外的 onPop
-        const isTop = (idx === stack.length - 1);
-        stack.splice(idx, 1);
-        if (isTop) {
-          try {
-            isNavigatingBack = true;
-            window.history.back();
-          } catch {} finally {
-            isNavigatingBack = false;
-          }
-        }
-      }
+    // 当组件通过 UI 正常状态切换卸载时（例如主动调用了 onBack/关闭），
+    // 我们只把 entry 从我们的 JS 栈中移除，不要调用 history.back()，
+    // 以免异步触发 popstate 造成二次回退误杀上一层！
+    const idx = stack.findIndex(e => e.id === entryId);
+    if (idx !== -1) {
+      stack.splice(idx, 1);
     }
   };
 }
 
 /**
- * 主动回退一层（等同于点击虚拟返回按钮），会触发浏览器 history.back()，进而触发 popstate 和 onPop。
+ * 主动回退一层：供屏幕左上角的 UI 返回按钮统一调用。
+ * 直接触发浏览器的 history.back()，让 popstate 统一分发 onPop，
+ * 从而实现「点击虚拟返回键」与「手机物理返回键」100% 走完全一致的逻辑！
  */
 export function popNav(): void {
   if (typeof window === "undefined") return;
