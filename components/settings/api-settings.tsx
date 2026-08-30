@@ -114,6 +114,8 @@ export function ApiSettings() {
     } | null>(null);
     const draggingIdRef = useRef<string | null>(null);
     const isTouchDragRef = useRef(false);
+    const autoScrollRafRef = useRef<number | null>(null);
+    const latestClientYRef = useRef<number>(0);
 
     const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= configs.length || toIndex >= configs.length) return;
@@ -141,7 +143,37 @@ export function ApiSettings() {
             }
 
             if (isTouchDragRef.current) {
+                latestClientYRef.current = clientY;
                 setDragPos({ x: clientX - state.grabOffsetX, y: clientY - state.grabOffsetY });
+
+                // 边缘自动滚动检测
+                const viewportHeight = window.innerHeight;
+                const scrollZone = 90;
+                const scrollContainer = document.querySelector(".page-body") as HTMLElement || document.scrollingElement || document.documentElement;
+
+                const checkAutoScroll = () => {
+                    if (!isTouchDragRef.current) {
+                        if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+                        autoScrollRafRef.current = null;
+                        return;
+                    }
+                    const currentY = latestClientYRef.current;
+                    if (currentY > viewportHeight - scrollZone) {
+                        const intensity = Math.min(1, (currentY - (viewportHeight - scrollZone)) / scrollZone);
+                        scrollContainer.scrollTop += intensity * 16;
+                    } else if (currentY < scrollZone) {
+                        const intensity = Math.min(1, (scrollZone - currentY) / scrollZone);
+                        scrollContainer.scrollTop -= intensity * 16;
+                    }
+                    autoScrollRafRef.current = requestAnimationFrame(checkAutoScroll);
+                };
+
+                if (!autoScrollRafRef.current && (clientY > viewportHeight - scrollZone || clientY < scrollZone)) {
+                    autoScrollRafRef.current = requestAnimationFrame(checkAutoScroll);
+                } else if (autoScrollRafRef.current && clientY >= scrollZone && clientY <= viewportHeight - scrollZone) {
+                    cancelAnimationFrame(autoScrollRafRef.current);
+                    autoScrollRafRef.current = null;
+                }
 
                 // 隐藏被拖拽的浮层，以精确探测下方真实的卡槽位置
                 const ghostEl = document.getElementById("api-drag-ghost");
@@ -182,6 +214,10 @@ export function ApiSettings() {
         };
 
         const onUp = () => {
+            if (autoScrollRafRef.current) {
+                cancelAnimationFrame(autoScrollRafRef.current);
+                autoScrollRafRef.current = null;
+            }
             if (touchStateRef.current && isTouchDragRef.current) {
                 document.body.style.overflow = "";
                 document.body.style.touchAction = "";
