@@ -611,23 +611,31 @@ export default function MusicApp({ onClose }: Props) {
             </div>
             </div>
 
-            {/* 新建分组小弹窗 */}
+            {/* 新建分组弹窗 */}
             {showNewCategory && (
                 <div className="music-settings-modal-overlay" onClick={() => setShowNewCategory(false)}>
-                    <div className="music-settings-modal-dialog" style={{ maxWidth: 280, padding: 16 }} onClick={e => e.stopPropagation()}>
-                        <div style={{ fontSize: 'calc(13px*var(--app-text-scale,1))', fontWeight: 600, color: 'var(--c-music-text)', marginBottom: 10 }}>新建音乐分组</div>
-                        <input
-                            className="music-settings-input"
-                            style={{ height: 34, marginBottom: 12 }}
-                            placeholder="输入分组名称"
-                            value={newCategoryName}
-                            onChange={e => setNewCategoryName(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && handleCreateCategory()}
-                            autoFocus
-                        />
-                        <div className="music-settings-actions">
+                    <div className="music-cat-modal-dialog" onClick={e => e.stopPropagation()}>
+                        <div className="music-cat-modal-header">
+                            <h2>新建音乐分组</h2>
+                            <button className="music-settings-close" onClick={() => setShowNewCategory(false)}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="music-cat-modal-body" style={{ padding: '24px 20px 8px' }}>
+                            <div className="music-settings-label" style={{ marginBottom: 8 }}>分组名称</div>
+                            <input
+                                className="music-settings-input"
+                                style={{ height: 42, fontSize: 'calc(14px*var(--app-text-scale,1))' }}
+                                placeholder="例如：通勤路上、睡前听"
+                                value={newCategoryName}
+                                onChange={e => setNewCategoryName(e.target.value)}
+                                onKeyDown={e => e.key === "Enter" && handleCreateCategory()}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="music-cat-modal-footer">
                             <button className="music-settings-btn" onClick={() => setShowNewCategory(false)}>取消</button>
-                            <button className="music-settings-btn music-settings-btn-primary" onClick={handleCreateCategory}>确定</button>
+                            <button className="music-settings-btn music-settings-btn-primary" onClick={handleCreateCategory}>创建</button>
                         </div>
                     </div>
                 </div>
@@ -1474,27 +1482,50 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
             {/* 加入分组弹窗 */}
             {assignTarget && categories && onAssignCategory && (
                 <div className="music-settings-modal-overlay" onClick={() => setAssignTarget(null)}>
-                    <div className="music-settings-modal-dialog" style={{ maxWidth: 300 }} onClick={e => e.stopPropagation()}>
-                        <div className="music-settings-header" style={{ padding: '14px 16px 8px' }}>
-                            <h2 style={{ fontSize: 'calc(13px*var(--app-text-scale,1))' }}>「{assignTarget.title}」加入分组</h2>
+                    <div className="music-cat-modal-dialog" onClick={e => e.stopPropagation()}>
+                        <div className="music-cat-modal-header">
+                            <h2>选择分组</h2>
                             <button className="music-settings-close" onClick={() => setAssignTarget(null)}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                             </button>
                         </div>
-                        <div style={{ maxHeight: '52vh', overflowY: 'auto', padding: '6px 12px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <button
-                                className="music-settings-btn"
-                                style={{ height: 36, justifyContent: 'flex-start', padding: '0 12px', color: assignTarget.category ? 'var(--c-music-text)' : 'var(--c-music-accent)' }}
-                                onClick={() => { onAssignCategory(assignTarget.id, undefined); setAssignTarget(null); }}
-                            >未分组</button>
-                            {categories.map(cat => (
-                                <button
-                                    key={cat}
-                                    className="music-settings-btn"
-                                    style={{ height: 36, justifyContent: 'flex-start', padding: '0 12px', color: assignTarget.category === cat ? 'var(--c-music-accent)' : 'var(--c-music-text)' }}
-                                    onClick={() => { onAssignCategory(assignTarget.id, cat); setAssignTarget(null); }}
-                                >{cat}</button>
-                            ))}
+                        <div className="music-cat-modal-body">
+                            <div className="music-cat-modal-header" style={{ padding: '0 0 6px', borderBottom: 'none', flexShrink: 0 }}>
+                                <span style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', color: 'var(--c-music-accent)' }}>{assignTarget.title}</span>
+                            </div>
+                            {categories.length === 0 ? (
+                                <div className="music-cat-row-empty">还没有自定义分组，请先在顶部点击 + 新建</div>
+                            ) : (
+                                <>
+                                    <button
+                                        className="music-cat-row"
+                                        {...(!assignTarget.category ? { "data-current": "" } : {})}
+                                        onClick={() => { onAssignCategory(assignTarget.id, undefined); setAssignTarget(null); }}
+                                    >
+                                        <span className="music-cat-row-name">未分组</span>
+                                        {!assignTarget.category && (
+                                            <span className="music-cat-row-check" aria-hidden="true">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                            </span>
+                                        )}
+                                    </button>
+                                    {categories.map(cat => (
+                                        <button
+                                            key={cat}
+                                            className="music-cat-row"
+                                            {...(assignTarget.category === cat ? { "data-current": "" } : {})}
+                                            onClick={() => { onAssignCategory(assignTarget.id, cat); setAssignTarget(null); }}
+                                        >
+                                            <span className="music-cat-row-name">{cat}</span>
+                                            {assignTarget.category === cat && (
+                                                <span className="music-cat-row-check" aria-hidden="true">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

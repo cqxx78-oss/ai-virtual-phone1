@@ -201,13 +201,13 @@
 
 .music-cat-tab {
     flex: none;
-    height: 30px;
-    padding: 0 12px;
+    height: 38px;
+    padding: 0 18px;
     border-radius: 999px;
     border: 1px solid var(--c-music-surface-solid);
     background: var(--c-music-surface);
     color: var(--c-music-accent);
-    font-size: calc(11.5px*var(--app-text-scale,1));
+    font-size: calc(12.5px*var(--app-text-scale,1));
     font-weight: 500;
     letter-spacing: 0.3px;
     cursor: pointer;
@@ -216,6 +216,7 @@
     gap: 4px;
     transition: all 0.2s;
     white-space: nowrap;
+    box-shadow: 0 1px 3px var(--c-music-accent-dim);
 }
 
 .music-cat-tab i {
@@ -248,9 +249,9 @@
 }
 
 .music-cat-tab-add {
-    width: 30px;
+    width: 38px;
     padding: 0;
-    font-size: calc(15px*var(--app-text-scale,1));
+    font-size: calc(17px*var(--app-text-scale,1));
     font-weight: 400;
     justify-content: center;
 }
@@ -264,6 +265,163 @@
 
 .music-cat-tab-del:active {
     background: rgba(255, 71, 87, 0.18);
+}
+
+/* ── 分组弹窗（新建 / 加入分组） ── */
+
+.music-cat-modal-dialog {
+    width: 88%;
+    max-width: 360px;
+    height: 50vh;
+    min-height: 320px;
+    max-height: 540px;
+    background: var(--c-music-surface-solid);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border-radius: 22px;
+    border: 1px solid var(--c-music-surface-solid);
+    box-shadow: 0 16px 48px var(--c-music-accent-dim);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: music-cat-modal-in 0.32s var(--ease-out);
+}
+
+@keyframes music-cat-modal-in {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.music-cat-modal-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 12px;
+    border-bottom: 1px solid var(--c-music-surface);
+}
+
+.music-cat-modal-header h2 {
+    margin: 0;
+    font-size: calc(14.4px*var(--app-text-scale,1));
+    font-weight: 600;
+    color: var(--c-music-text);
+    letter-spacing: 0.3px;
+    max-width: 80%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-cat-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* 滚动条默认隐藏（无轨道），hover/focus 时才显示 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.music-cat-modal-body::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    background: transparent;
+}
+
+.music-cat-modal-body:hover,
+.music-cat-modal-body:focus-within {
+    scrollbar-width: thin;
+    scrollbar-color: var(--c-music-accent) transparent;
+}
+
+.music-cat-modal-body:hover::-webkit-scrollbar,
+.music-cat-modal-body:focus-within::-webkit-scrollbar {
+    width: 4px;
+}
+
+.music-cat-modal-body:hover::-webkit-scrollbar-thumb,
+.music-cat-modal-body:focus-within::-webkit-scrollbar-thumb {
+    background: var(--c-music-accent);
+    border-radius: 2px;
+    opacity: 0.4;
+}
+
+.music-cat-modal-footer {
+    flex-shrink: 0;
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px 16px;
+    border-top: 1px solid var(--c-music-surface);
+}
+
+/* 分组列表项（加入分组弹窗） */
+
+.music-cat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--c-music-surface);
+    border: 1px solid transparent;
+    color: var(--c-music-text);
+    font-size: calc(13.5px*var(--app-text-scale,1));
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    font-family: inherit;
+}
+
+.music-cat-row:active {
+    transform: scale(0.98);
+    background: var(--c-music-surface-solid);
+}
+
+.music-cat-row[data-current] {
+    background: var(--c-music-accent-dim);
+    border-color: var(--c-music-accent);
+    color: var(--c-music-accent);
+    font-weight: 600;
+}
+
+.music-cat-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-cat-row-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-left: 8px;
+    color: var(--c-music-accent);
+}
+
+.music-cat-row-empty {
+    padding: 32px 0;
+    text-align: center;
+    color: var(--c-music-accent);
+    opacity: 0.6;
+    font-size: calc(12px*var(--app-text-scale,1));
 }
 
 /* ── Song List ── */
