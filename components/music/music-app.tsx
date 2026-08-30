@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import {
-    loadAllTracks, saveTrack, deleteTrack,
+    loadAllTracks, saveTrack, deleteTrack, updateTrackMeta,
     generateTrackId, parseFilename, getAudioDuration,
     type MusicTrack,
 } from "@/lib/music-storage";
@@ -180,6 +180,15 @@ export default function MusicApp({ onClose }: Props) {
         await deleteTrack(trackId);
         setTracks(prev => prev.filter(t => t.id !== trackId));
         if (player.currentTrack?.id === trackId) player.stop();
+    };
+
+    const handleUpdateTrack = async (trackId: string, updates: Partial<MusicTrack>) => {
+        await updateTrackMeta(trackId, updates);
+        setTracks(prev => prev.map(t => t.id === trackId ? { ...t, ...updates } : t));
+        if (player.currentTrack?.id === trackId) {
+            const updated = { ...player.currentTrack, ...updates };
+            player.playTrack(updated);
+        }
     };
 
     /** Convert NeteaseSearchResult → MusicTrack */
@@ -377,7 +386,7 @@ export default function MusicApp({ onClose }: Props) {
                     ) : tracks.length === 0 ? (
                         <div className="music-empty"><div className="music-empty-icon">♪</div><div className="music-empty-text">还没有音乐</div></div>
                     ) : (
-                        <SongList tracks={tracks} player={player} formatTime={formatTime} onDelete={handleDelete} onPlay={handlePlay} />
+                        <SongList tracks={tracks} player={player} formatTime={formatTime} onDelete={handleDelete} onPlay={handlePlay} onUpdateTrack={handleUpdateTrack} />
                     )}
                 </>
             )}
@@ -1144,14 +1153,53 @@ function NeteaseSongRow({ song, index, formatTime, onPlay }: {
 }
 
 // ── Song List (local) ──
-function SongList({ tracks, player, formatTime, onDelete, onPlay }: {
+function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack }: {
     tracks: MusicTrack[];
     player: MusicControlsValue;
     formatTime: (s: number) => string;
     onDelete: (id: string, e: React.MouseEvent) => void;
     onPlay: (t: MusicTrack) => void;
+    onUpdateTrack: (id: string, updates: Partial<MusicTrack>) => void;
 }) {
     const [deleteTarget, setDeleteTarget] = useState<MusicTrack | null>(null);
+    const [editingTrack, setEditingTrack] = useState<MusicTrack | null>(null);
+    const [editTitle, setEditTitle] = useState("");
+    const [editArtist, setEditArtist] = useState("");
+    const [editAlbum, setEditAlbum] = useState("");
+    const [editLyrics, setEditLyrics] = useState("");
+    const [editCover, setEditCover] = useState<string | undefined>(undefined);
+    const coverFileRef = useRef<HTMLInputElement>(null);
+
+    const startEditing = (t: MusicTrack, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditingTrack(t);
+        setEditTitle(t.title || "");
+        setEditArtist(t.artist || "");
+        setEditAlbum(t.album || "");
+        setEditLyrics(t.lyrics || "");
+        setEditCover(t.coverUrl);
+    };
+
+    const handleCoverChange = async (files: FileList | null) => {
+        if (!files || !files[0]) return;
+        try {
+            const dataUrl = await fileToCompressedDataUrl(files[0], 400, 0.85);
+            setEditCover(dataUrl);
+        } catch { /* ignore */ }
+        if (coverFileRef.current) coverFileRef.current.value = "";
+    };
+
+    const handleSaveEdit = () => {
+        if (!editingTrack) return;
+        onUpdateTrack(editingTrack.id, {
+            title: editTitle.trim() || editingTrack.title,
+            artist: editArtist.trim() || editingTrack.artist,
+            album: editAlbum.trim() || undefined,
+            lyrics: editLyrics.trim() || undefined,
+            coverUrl: editCover,
+        });
+        setEditingTrack(null);
+    };
 
     return (
         <div className="music-list">
@@ -1177,7 +1225,13 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay }: {
                         </div>
                         <div className="music-song-duration">{formatTime(track.duration)}</div>
                         <div className="music-song-actions">
-                            <button className="music-song-action-btn" data-danger="" onClick={(e) => { e.stopPropagation(); setDeleteTarget(track); }}>
+                            <button className="music-song-action-btn" title="编辑信息与歌词" onClick={(e) => startEditing(track, e)}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                    <path d="m15 5 4 4" />
+                                </svg>
+                            </button>
+                            <button className="music-song-action-btn" data-danger="" title="删除" onClick={(e) => { e.stopPropagation(); setDeleteTarget(track); }}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                                 </svg>
@@ -1186,6 +1240,68 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay }: {
                     </div>
                 );
             })}
+
+            {/* Edit modal */}
+            {editingTrack && (
+                <div className="music-settings-modal-overlay" onClick={() => setEditingTrack(null)}>
+                    <div className="music-settings-modal-dialog" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+                        <div className="music-settings-header">
+                            <h2>编辑歌曲信息</h2>
+                            <button className="music-settings-close" onClick={() => setEditingTrack(null)}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="music-settings-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                            <div className="music-settings-section">
+                                <div className="music-settings-label">封面图片</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                                    <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', background: 'var(--c-music-surface-solid)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {editCover ? <img src={editCover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, color: 'var(--c-music-accent)' }}>无封面</span>}
+                                    </div>
+                                    <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={e => handleCoverChange(e.target.files)} />
+                                    <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '6px 12px' }} onClick={() => coverFileRef.current?.click()}>
+                                        更换封面
+                                    </button>
+                                    {editCover && (
+                                        <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '6px 12px' }} onClick={() => setEditCover(undefined)}>
+                                            移除
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="music-settings-section">
+                                <div className="music-settings-label">歌曲名</div>
+                                <input className="music-settings-input" value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="输入歌曲名" />
+                            </div>
+                            <div className="music-settings-section">
+                                <div className="music-settings-label">歌手 / 艺术家</div>
+                                <input className="music-settings-input" value={editArtist} onChange={e => setEditArtist(e.target.value)} placeholder="输入歌手名" />
+                            </div>
+                            <div className="music-settings-section">
+                                <div className="music-settings-label">专辑名称（可选）</div>
+                                <input className="music-settings-input" value={editAlbum} onChange={e => setEditAlbum(e.target.value)} placeholder="输入专辑名" />
+                            </div>
+                            <div className="music-settings-section">
+                                <div className="music-settings-label">歌词（支持 LRC 格式或纯文本）</div>
+                                <div className="music-settings-hint">粘贴形如 [00:12.34]歌词内容 的 LRC 歌词可实现滚动同步</div>
+                                <textarea
+                                    className="music-settings-input"
+                                    style={{ height: 140, resize: 'vertical', fontFamily: 'monospace', fontSize: 'calc(12px*var(--app-text-scale,1))', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}
+                                    value={editLyrics}
+                                    onChange={e => setEditLyrics(e.target.value)}
+                                    placeholder="[00:00.00]歌曲名
+[00:04.00]歌手名
+[00:08.50]第一句歌词..."
+                                />
+                            </div>
+                            <div className="music-settings-actions" style={{ marginTop: 16 }}>
+                                <button className="music-settings-btn" onClick={() => setEditingTrack(null)}>取消</button>
+                                <button className="music-settings-btn music-settings-btn-primary" onClick={handleSaveEdit}>保存修改</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Delete confirm modal */}
             {deleteTarget && (
