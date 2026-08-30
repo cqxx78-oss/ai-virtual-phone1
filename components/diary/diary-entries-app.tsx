@@ -237,7 +237,7 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
   }, [customFonts, notify]);
 
   const handleDiaryFontScaleChange = useCallback((scale: number) => {
-    const normalized = Math.min(1.25, Math.max(0.85, scale));
+    const normalized = Math.min(1.50, Math.max(0.70, scale));
     setDiaryFontScale(normalized);
     saveDiaryEntryFontScale(normalized);
   }, []);
@@ -1134,9 +1134,9 @@ function DiaryEntryFontPanel({
               </span>
               <input
                 type="range"
-                min="0.85"
-                max="1.25"
-                step="any"
+                min="0.7"
+                max="1.5"
+                step="0.01"
                 value={scale}
                 onChange={event => onScaleChange(Number(event.target.value))}
               />

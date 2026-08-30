@@ -156,11 +156,11 @@ export function saveDiaryEntryFontAssetId(assetId: string | null): void {
 export function loadDiaryEntryFontScale(): number {
   const raw = Number(kvGet(DIARY_ENTRY_FONT_SCALE_KEY));
   if (!Number.isFinite(raw)) return 1;
-  return Math.min(1.25, Math.max(0.85, Number(raw.toFixed(2))));
+  return Math.min(1.50, Math.max(0.70, Number(raw.toFixed(2))));
 }
 
 export function saveDiaryEntryFontScale(scale: number): void {
-  const normalized = Math.min(1.25, Math.max(0.85, Number(scale.toFixed(2))));
+  const normalized = Math.min(1.50, Math.max(0.70, Number(scale.toFixed(2))));
   if (Math.abs(normalized - 1) < 0.001) {
     kvRemove(DIARY_ENTRY_FONT_SCALE_KEY);
     return;

@@ -669,7 +669,7 @@
 
 .diary-entry-list {
   display: grid;
-  gap: 18px;
+  gap: 10px;
 }
 
 .diary-entry-card {
@@ -678,10 +678,10 @@
   flex-direction: column;
   align-items: stretch;
   width: 100%;
-  min-height: 176px;
+  min-height: 88px;
   border: none;
   border-radius: 0;
-  padding: 18px 18px 16px;
+  padding: 10px 14px 10px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 252, 239, 0.72)),
     #fffdf4;
@@ -736,10 +736,10 @@
 .diary-entry-card::before {
   content: "";
   position: absolute;
-  top: -9px;
+  top: -7px;
   left: 50%;
-  width: 54px;
-  height: 18px;
+  width: 40px;
+  height: 14px;
   background: rgba(232, 207, 146, 0.56);
   border: 1px solid rgba(147, 117, 62, 0.12);
   transform: translateX(-50%) rotate(2deg);
@@ -796,7 +796,7 @@
 
 .diary-entry-card strong {
   display: block;
-  margin: 20px 0 12px;
+  margin: 6px 0 4px;
   font-size: calc(24px*var(--app-text-scale,1)*var(--diary-entry-font-scale,1));
   line-height: 1.32;
   font-weight: 400;
@@ -805,7 +805,7 @@
 
 .diary-entry-card-text {
   display: block;
-  min-height: 46px;
+  min-height: 24px;
   font-size: calc(18px*var(--app-text-scale,1)*var(--diary-entry-font-scale,1));
   line-height: 1.55;
   color: rgba(42, 39, 34, 0.78);
@@ -817,7 +817,7 @@
   justify-content: flex-end;
   gap: 6px;
   margin-top: auto;
-  padding-top: 18px;
+  padding-top: 6px;
   font-size: calc(11px*var(--app-text-scale,1));
   line-height: 1.25;
   color: rgba(42, 39, 34, 0.56);
