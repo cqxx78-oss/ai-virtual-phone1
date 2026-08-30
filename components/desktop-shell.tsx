@@ -1137,7 +1137,12 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       const handler = (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler;
       if (typeof handler === "function") {
         try {
-          if (handler()) return;
+          if (handler()) {
+            // 如果应用内部消费了这次返回，说明我们依然停留在应用内，
+            // 需要把刚才被浏览器 pop 出来的状态重新 push 回去，维持栈的深度。
+            window.history.pushState({ appOpen: true, appId: activeAppRef.current }, "");
+            return;
+          }
         } catch {
           // 应用处理异常时降级为关闭应用
         }
