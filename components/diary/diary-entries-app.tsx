@@ -192,11 +192,23 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
     }
     const styleRules: string[] = [];
     if (diaryFontAssetId && customFontUrls[diaryFontAssetId]) {
-      styleRules.push(`@font-face{font-family:"AIPhoneDiaryGlobalFont";src:url("${customFontUrls[diaryFontAssetId]}");font-display:swap;}`);
+      styleRules.push(`@font-face{
+  font-family: "AIPhoneDiaryGlobalFont";
+  src: url("${customFontUrls[diaryFontAssetId]}");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}`);
     }
     customFonts.forEach(f => {
       if (f.assetId && customFontUrls[f.assetId]) {
-        styleRules.push(`@font-face{font-family:"AIPhoneDiaryFont_${f.id}";src:url("${customFontUrls[f.assetId]}");font-display:swap;}`);
+        styleRules.push(`@font-face{
+  font-family: "AIPhoneDiaryFont_${f.id}";
+  src: url("${customFontUrls[f.assetId]}");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}`);
       }
     });
     node.textContent = styleRules.join("\n");
