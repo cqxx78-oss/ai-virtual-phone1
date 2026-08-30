@@ -222,6 +222,28 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         return () => window.removeEventListener("popstate", handlePopState);
     }, []);
 
+    // 注册全局返回键处理器：聊天内的"应用根级"子状态（联系人添加面板、CSS 编辑器等
+    // 临时子页）优先消化；聊天室本身已有自己的 pushState/popstate 监听器，
+    // 桌面在询问我们之前那次 popstate 已被聊天室消化，这里只需兜底。
+    useEffect(() => {
+        const canHandle = () => {
+            if (pendingAddContactId) {
+                setPendingAddContactId(null);
+                return true;
+            }
+            if (hideTabBar) {
+                window.dispatchEvent(new CustomEvent("chat-back-from-subpage"));
+                return true;
+            }
+            return false;
+        };
+        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+        return () => {
+            const w = window as unknown as { __phoneBackHandler?: () => boolean };
+            if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+        };
+    }, [hideTabBar, pendingAddContactId]);
+
     const handleRoomBack = useCallback(() => {
         if (historyPushedRef.current) {
             window.history.back();

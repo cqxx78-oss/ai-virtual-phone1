@@ -215,6 +215,23 @@ export function PhoneCharacterApp({ onClose, onNotice }: PhoneCharacterAppProps)
     setView({ type: "list", id: null, isEditing: false });
   }
 
+  // 注册全局返回键处理器：角色管理内的详情/编辑视图优先自己消化；
+  // 退到列表主页才让桌面关闭整个应用。
+  useEffect(() => {
+    const canHandle = () => {
+      if (view.type === "detail") {
+        setView({ type: "list", id: null, isEditing: false });
+        return true;
+      }
+      return false;
+    };
+    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+    return () => {
+      const w = window as unknown as { __phoneBackHandler?: () => boolean };
+      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+    };
+  }, [view]);
+
   return (
     <>
       <div className="char-app">

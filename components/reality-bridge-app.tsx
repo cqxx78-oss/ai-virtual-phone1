@@ -266,6 +266,34 @@ export function RealityBridgeApp({ onClose, onNotice }: {
   const charName = useCallback((id?: string) => characters.find(c => c.id === id)?.name ?? "角色", [characters]);
   const { config, ready } = bridgeConnection();
 
+  // 注册全局返回键处理器：现实桥内的向导/编辑/确认/设置等模态优先自己消化；
+  // 退到主页（main tab）才让桌面关闭整个应用。
+  useEffect(() => {
+    const canHandle = () => {
+      if (menuOpen) { setMenuOpen(false); return true; }
+      if (confirmClear) { setConfirmClear(false); return true; }
+      if (editingScreenChat) { setEditingScreenChat(null); return true; }
+      if (editingItem) { setEditingItem(null); return true; }
+      if (editingShortcut) { setEditingShortcut(null); return true; }
+      if (editing) { setEditing(null); return true; }
+      if (dataSnapshot && dataSnapshot !== "none") { setDataSnapshot(null); return true; }
+      if (screenWizStep > 1) { setScreenWizStep(1); return true; }
+      if (dwizStep > 1) { setDwizStep(1); return true; }
+      if (swizStep > 1) { setSwizStep(1); return true; }
+      if (wizStep > 1) { setWizStep(1); return true; }
+      return false;
+    };
+    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+    return () => {
+      const w = window as unknown as { __phoneBackHandler?: () => boolean };
+      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+    };
+  }, [
+    confirmClear, dataSnapshot, dwizStep, editing, editingItem,
+    editingScreenChat, editingShortcut, menuOpen, screenWizStep,
+    swizStep, wizStep,
+  ]);
+
   useEffect(() => {
     const refresh = () => setFeed(loadBridgeFeed());
     window.addEventListener(REALITY_BRIDGE_FEED_UPDATED_EVENT, refresh);

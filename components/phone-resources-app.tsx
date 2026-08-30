@@ -63,6 +63,42 @@ export function PhoneResourcesApp({ onClose, onNotice, initialPage }: { onClose:
         }
     };
 
+    // 注册全局返回键处理器：资源库内子页面（记忆库/漫卷/记忆详情/记忆设置）
+    // 优先自己消化；只有在主页才让桌面关闭整个应用。
+    useEffect(() => {
+        const canHandle = () => {
+            if (currentPage === "memory") {
+                if (memoryView === "settings") {
+                    setMemoryView(prevMemoryView);
+                    return true;
+                }
+                if (memoryView === "detail") {
+                    setMemoryView("list");
+                    return true;
+                }
+                setCurrentPage("main");
+                setMemoryView("list");
+                setMemoryCharId("");
+                setMemoryCharName("");
+                return true;
+            }
+            if (currentPage === "vn_assets") {
+                setCurrentPage("main");
+                return true;
+            }
+            if (currentPage !== "main") {
+                setCurrentPage("main");
+                return true;
+            }
+            return false;
+        };
+        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+        return () => {
+            const w = window as unknown as { __phoneBackHandler?: () => boolean };
+            if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+        };
+    }, [currentPage, memoryView, prevMemoryView]);
+
     const handleSelectChar = (charId: string) => {
         const chars = loadCharacters();
         const char = chars.find(c => c.id === charId);

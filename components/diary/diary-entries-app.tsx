@@ -665,6 +665,43 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
   );
   const activeBookBusy = Boolean(activeBook && generatingCharacterIds.includes(activeBook.characterId));
 
+  // 注册全局返回键处理器：手记内多层子页面（角色日记本→单篇日记详情→各设置/写作/字体面板→删除确认）
+  // 优先自己消化；只有在"日记本列表主页"才让桌面关闭整个应用。
+  useEffect(() => {
+    const canHandle = () => {
+      if (deleteCandidateEntry) {
+        setDeleteCandidateEntry(null);
+        return true;
+      }
+      if (activeEntry) {
+        setActiveEntry(null);
+        return true;
+      }
+      if (timerSettingsOpen) {
+        setTimerSettingsOpen(false);
+        return true;
+      }
+      if (writePanelOpen) {
+        setWritePanelOpen(false);
+        return true;
+      }
+      if (fontPanelOpen) {
+        setFontPanelOpen(false);
+        return true;
+      }
+      if (activeBook) {
+        setActiveCharacterId(null);
+        return true;
+      }
+      return false;
+    };
+    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+    return () => {
+      const w = window as unknown as { __phoneBackHandler?: () => boolean };
+      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+    };
+  }, [activeBook, activeEntry, deleteCandidateEntry, fontPanelOpen, timerSettingsOpen, writePanelOpen]);
+
   return (
     <section className={`diary-app diary-entry-app ${entryDrag ? "is-entry-dragging" : ""}`} style={diaryEntryStyle}>
       {generatingCharacterIds.length > 0 && (

@@ -1124,6 +1124,17 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
 
   useEffect(() => {
     const handlePopState = () => {
+      // 物理返回键 / 侧滑手势触发时，先询问当前应用是否能自己处理子页面回退
+      // （如日记本→日记详情、设置→子页、购物→商品详情、聊天→会话等）。
+      // 应用返回 true 就让它自己消化，桌面这次什么都不做。
+      const handler = (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler;
+      if (typeof handler === "function") {
+        try {
+          if (handler()) return;
+        } catch {
+          // 应用处理异常时降级为关闭应用
+        }
+      }
       if (appHistoryPushedRef.current) {
         appHistoryPushedRef.current = false;
         setActiveApp(null);

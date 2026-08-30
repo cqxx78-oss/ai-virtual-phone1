@@ -206,6 +206,29 @@ export function PhoneSettingsApp({ onClose, onNotice }: SettingsPageProps) {
         }
     };
 
+    // 注册全局返回键处理器：应用内有子页面时自己消化
+    // （API 设置、语音、预设、世界书、正则等子页），退到主页才让桌面关掉整个应用。
+    useEffect(() => {
+        const canHandle = () => {
+            if (overrideBack) {
+                overrideBack();
+                return true;
+            }
+            if (currentPage !== "main") {
+                setCurrentPage("main");
+                setSubpageTitle(null);
+                setOverrideBack(null);
+                return true;
+            }
+            return false;
+        };
+        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+        return () => {
+            const w = window as unknown as { __phoneBackHandler?: () => boolean };
+            if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+        };
+    }, [currentPage, overrideBack]);
+
     const makeCardItem = (item: typeof SETTINGS_MENU[number]): CardItem => ({
         id: item.id,
         icon: item.icon,

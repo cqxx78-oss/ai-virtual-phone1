@@ -152,6 +152,51 @@ export function PhoneCalendarApp({
   const [editingItem, setEditingItem] = useState<(CalendarEventDraft & { originalDate?: string }) | null>(null);
   const autoGenerateEnabled = config.autoGenerateEnabled;
 
+  // 注册全局返回键处理器：日历内的详情/各种面板/编辑/确认弹窗优先自己消化；
+  // 退到月视图主页才让桌面关闭整个应用。
+  useEffect(() => {
+    const canHandle = () => {
+      if (editingItem) {
+        setEditingItem(null);
+        return true;
+      }
+      if (showGenerateConfirm) {
+        setShowGenerateConfirm(false);
+        return true;
+      }
+      if (showAutoConfirm) {
+        setShowAutoConfirm(false);
+        return true;
+      }
+      if (showThemePanel) {
+        setShowThemePanel(false);
+        return true;
+      }
+      if (showDaysPanel) {
+        setShowDaysPanel(false);
+        return true;
+      }
+      if (showMenstrualSettings) {
+        setShowMenstrualSettings(false);
+        return true;
+      }
+      if (fabMenuOpen) {
+        setFabMenuOpen(false);
+        return true;
+      }
+      if (view === "detail") {
+        setView("month");
+        return true;
+      }
+      return false;
+    };
+    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+    return () => {
+      const w = window as unknown as { __phoneBackHandler?: () => boolean };
+      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+    };
+  }, [editingItem, fabMenuOpen, showAutoConfirm, showDaysPanel, showGenerateConfirm, showMenstrualSettings, showThemePanel, view]);
+
   const [menstrualDraft, setMenstrualDraft] = useState<{
     cycleLength: string;
     periodLength: string;

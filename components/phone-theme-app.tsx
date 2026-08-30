@@ -206,6 +206,39 @@ export function PhoneThemeApp({
   const [themeTransferBusy, setThemeTransferBusy] = useState(false);
   const [confirmThemeReset, setConfirmThemeReset] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+
+  // 注册全局返回键处理器：主题应用内的子页（调色板/壁纸/图标/组件/壳/字号/CSS 变量/
+  // 状态栏调整、字号调整、主题传输、确认重置）优先自己消化；退到菜单主页才让桌面关闭。
+  useEffect(() => {
+    const canHandle = () => {
+      if (confirmThemeReset) {
+        setConfirmThemeReset(false);
+        return true;
+      }
+      if (showThemeTransfer) {
+        setShowThemeTransfer(false);
+        return true;
+      }
+      if (showTextAdjust) {
+        setShowTextAdjust(false);
+        return true;
+      }
+      if (showStatusBarAdjust) {
+        setShowStatusBarAdjust(false);
+        return true;
+      }
+      if (section !== "menu" && isThemeSection(section)) {
+        setSection("menu");
+        return true;
+      }
+      return false;
+    };
+    (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = canHandle;
+    return () => {
+      const w = window as unknown as { __phoneBackHandler?: () => boolean };
+      if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
+    };
+  }, [confirmThemeReset, section, showStatusBarAdjust, showTextAdjust, showThemeTransfer]);
   const statusBarTop = Number(draft.cssOverrides["--status-bar-top"]?.replace("px", "") || "12");
   const islandHidden = draft.cssOverrides["--status-island-visibility"] === "hidden";
 
