@@ -1030,6 +1030,13 @@ const MusicShellOverlays = memo(function MusicShellOverlays({
     onControllerChange(musicPlayer ? { closeFullPlayer: musicPlayer.closeFullPlayer } : null);
   }, [musicPlayer?.closeFullPlayer, onControllerChange]);
 
+  // 当退出音乐 App（回到桌面或切到其他 App）时，如果全屏播放器还开着，自动关闭，避免播放器悬挂在桌面上遮挡视线
+  useEffect(() => {
+    if (activeApp !== "music" && musicPlayer?.showFullPlayer) {
+      musicPlayer.closeFullPlayer();
+    }
+  }, [activeApp, musicPlayer]);
+
   return (
     <>
       {musicPlayer?.showFullPlayer && musicPlayer.currentTrack && <MusicPlayer />}

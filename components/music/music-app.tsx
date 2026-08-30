@@ -111,6 +111,38 @@ export default function MusicApp({ onClose }: Props) {
         return () => window.removeEventListener("music-library-updated", handleLibraryUpdated);
     }, []);
 
+    // 物理返回键 / 侧滑手势：在二级页面（每日推荐、歌单详情、设置弹窗等）时优先返回上一级，而非直接退出应用
+    useEffect(() => {
+        const prevHandler = (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler;
+        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = () => {
+            if (showSettings) {
+                setShowSettings(false);
+                return true;
+            }
+            if (showCssEditor) {
+                setShowCssEditor(false);
+                return true;
+            }
+            if (showNewCategory) {
+                setShowNewCategory(false);
+                return true;
+            }
+            if (dailyView) {
+                setDailyView(null);
+                return true;
+            }
+            if (activePlaylist) {
+                setActivePlaylist(null);
+                return true;
+            }
+            // 在主列表页，返回 false，让外层 DesktopShell 正常退出应用
+            return false;
+        };
+        return () => {
+            (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = prevHandler;
+        };
+    }, [showSettings, showCssEditor, showNewCategory, dailyView, activePlaylist]);
+
     const clearMusicToast = useCallback(() => {
         if (musicToastTimerRef.current) clearTimeout(musicToastTimerRef.current);
         if (musicLoadingFallbackRef.current) clearTimeout(musicLoadingFallbackRef.current);

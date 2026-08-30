@@ -71,6 +71,28 @@ export default function MusicPlayer() {
     useEffect(() => {
         if (showQueue) refreshLocalData();
     }, [showQueue, refreshLocalData]);
+
+    // 物理返回键 / 侧滑手势：全屏播放器打开时优先收起全屏播放器，退回到音乐列表
+    useEffect(() => {
+        const prevHandler = (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler;
+        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = () => {
+            // 如果有弹窗打开，先关弹窗
+            if (showQueue) {
+                setShowQueue(false);
+                return true;
+            }
+            if (artistView) {
+                setArtistView(null);
+                return true;
+            }
+            // 否则收起全屏播放器
+            player.closeFullPlayer();
+            return true;
+        };
+        return () => {
+            (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = prevHandler;
+        };
+    }, [player, showQueue, artistView]);
     const [artistView, setArtistView] = useState<{ id: number; name: string } | null>(null);
     const [palette, setPalette] = useState<CoverPalette>(DEFAULT_COVER_PALETTE);
     const [bgCfg, setBgCfg] = useState<MusicBgConfig>(() => loadMusicBg());
