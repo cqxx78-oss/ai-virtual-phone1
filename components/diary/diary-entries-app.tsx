@@ -35,8 +35,8 @@ const DIARY_USER_FONT_STYLE_ID = "ai-phone-diary-entry-user-font-face";
 
 const PRESET_DIARY_FONTS = [
   { id: "system", name: "系统默认", family: 'var(--app-font-family)' },
-  { id: "ximai", name: "喜脉体 (手写)", family: '"NoteWall Ximai", var(--app-font-family)' },
-  { id: "xiaozhitiao", name: "小纸条体 (手写)", family: '"NoteWall Xiaozhitiao", var(--app-font-family)' },
+  { id: "ximai", name: "喜脉体（默认）", family: '"NoteWall Ximai", var(--app-font-family)' },
+  { id: "xiaozhitiao", name: "小纸条体（默认）", family: '"NoteWall Xiaozhitiao", var(--app-font-family)' },
 ];
 
 type DiaryEntriesAppProps = {
@@ -1037,7 +1037,7 @@ function DiaryEntryFontPanel({
   const allFontOptions = useMemo(() => {
     const options: { id: string; name: string }[] = [
       ...PRESET_DIARY_FONTS.map(p => ({ id: p.id, name: p.name })),
-      ...customFonts.map(c => ({ id: c.id, name: `${c.name} (自定义)` })),
+      ...customFonts.map(c => ({ id: c.id, name: c.name })),
     ];
     return options;
   }, [customFonts]);
