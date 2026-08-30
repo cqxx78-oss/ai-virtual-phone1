@@ -100,9 +100,20 @@ export function ApiSettings() {
     // 拖拽排序逻辑
     const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-    const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const touchStateRef = useRef<{
+        index: number;
+        startX: number;
+        startY: number;
+        pointerId: number;
+        offsetX: number;
+        offsetY: number;
+        width: number;
+        height: number;
+        rect: DOMRect;
+        activated: boolean;
+    } | null>(null);
+    const draggingRef = useRef<number | null>(null);
     const isTouchDragRef = useRef(false);
-    const touchStartPos = useRef<{ x: number; y: number } | null>(null);
 
     const handleReorder = useCallback((fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= configs.length || toIndex >= configs.length) return;
@@ -112,60 +123,139 @@ export function ApiSettings() {
         persist(next);
     }, [configs, persist]);
 
-    // 触摸端长按拖拽处理
-    const handleTouchStart = (index: number, e: React.TouchEvent) => {
-        const touch = e.touches[0];
-        touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-        isTouchDragRef.current = false;
-        if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    // 全局指针事件(同时支持触屏 + 鼠标拖拽)
+    useEffect(() => {
+        const onMove = (clientX: number, clientY: number) => {
+            const state = touchStateRef.current;
+            if (!state || !state.activated) return;
 
-        touchTimerRef.current = setTimeout(() => {
-            isTouchDragRef.current = true;
-            setDraggingIndex(index);
-            if (navigator.vibrate) navigator.vibrate(40);
-        }, 350);
-    };
+            const dx = clientX - state.startX;
+            const dy = clientY - state.startY;
+            const dist = Math.hypot(dx, dy);
 
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (!touchStartPos.current) return;
-        const touch = e.touches[0];
-        const dx = Math.abs(touch.clientX - touchStartPos.current.x);
-        const dy = Math.abs(touch.clientY - touchStartPos.current.y);
+            // 长按未激活前,移动超过阈值就取消,允许正常滚动
+            if (!isTouchDragRef.current && dist > 10) {
+                state.activated = false;
+                touchStateRef.current = null;
+                return;
+            }
 
-        // 未激活长按前如果手指移动较大，取消长按判定以允许正常滚动页面
-        if (!isTouchDragRef.current && (dx > 10 || dy > 10)) {
-            if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
-            return;
-        }
+            if (isTouchDragRef.current) {
+                const draggedEl = document.querySelector(`[data-dragging-card="true"]`) as HTMLElement | null;
+                if (draggedEl) {
+                    draggedEl.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.05)`;
+                }
 
-        if (isTouchDragRef.current) {
-            e.preventDefault(); // 阻止页面滚动
-            const targetElement = document.elementFromPoint(touch.clientX, touch.clientY);
-            const cardEl = targetElement?.closest("[data-config-index]");
-            if (cardEl) {
-                const hoverIdx = Number(cardEl.getAttribute("data-config-index"));
-                if (!isNaN(hoverIdx) && hoverIdx !== dragOverIndex) {
-                    setDragOverIndex(hoverIdx);
-                    // 实时换位并更新当前拖拽指针
-                    if (draggingIndex !== null && hoverIdx !== draggingIndex) {
-                        handleReorder(draggingIndex, hoverIdx);
-                        setDraggingIndex(hoverIdx);
-                        if (navigator.vibrate) navigator.vibrate(25);
+                // 计算当前手指中心点对应的目标卡槽索引
+                const targetEl = document.elementFromPoint(clientX, clientY);
+                const cardEl = targetEl?.closest("[data-config-index]") as HTMLElement | null;
+                if (cardEl) {
+                    const hoverIdx = Number(cardEl.getAttribute("data-config-index"));
+                    if (!isNaN(hoverIdx) && draggingRef.current !== null && hoverIdx !== draggingRef.current) {
+                        handleReorder(draggingRef.current, hoverIdx);
+                        draggingRef.current = hoverIdx;
+                        if (navigator.vibrate) navigator.vibrate(15);
                     }
                 }
             }
-        }
+        };
+
+        const onTouchMove = (e: TouchEvent) => {
+            if (isTouchDragRef.current) {
+                e.preventDefault();
+            }
+            const touch = e.touches[0];
+            if (touch) onMove(touch.clientX, touch.clientY);
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!touchStateRef.current) return;
+            onMove(e.clientX, e.clientY);
+        };
+
+        const onUp = () => {
+            if (touchStateRef.current && isTouchDragRef.current) {
+                const draggedEl = document.querySelector(`[data-dragging-card="true"]`) as HTMLElement | null;
+                if (draggedEl) {
+                    draggedEl.style.transform = "";
+                    draggedEl.removeAttribute("data-dragging-card");
+                }
+            }
+            if (touchStateRef.current && isTouchDragRef.current) {
+                document.body.style.overflow = "";
+                document.body.style.touchAction = "";
+            }
+            touchStateRef.current = null;
+            draggingRef.current = null;
+            setDraggingIndex(null);
+            setDragOverIndex(null);
+            isTouchDragRef.current = false;
+        };
+
+        const onTouchEnd = () => onUp();
+        const onTouchCancel = () => onUp();
+        const onMouseUp = () => onUp();
+
+        // 使用 document 监听 + passive: false,确保 preventDefault 生效
+        document.addEventListener("touchmove", onTouchMove, { passive: false });
+        document.addEventListener("touchend", onTouchEnd);
+        document.addEventListener("touchcancel", onTouchCancel);
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+
+        return () => {
+            document.removeEventListener("touchmove", onTouchMove);
+            document.removeEventListener("touchend", onTouchEnd);
+            document.removeEventListener("touchcancel", onTouchCancel);
+            document.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseup", onMouseUp);
+        };
+    }, [handleReorder]);
+
+    const startDrag = (index: number, clientX: number, clientY: number) => {
+        const el = document.querySelector(`[data-config-index="${index}"]`) as HTMLElement | null;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        touchStateRef.current = {
+            index,
+            startX: clientX,
+            startY: clientY,
+            pointerId: -1,
+            offsetX: clientX - rect.left,
+            offsetY: clientY - rect.top,
+            width: rect.width,
+            height: rect.height,
+            rect,
+            activated: true,
+        };
+        isTouchDragRef.current = false;
+        draggingRef.current = index;
+
+        setTimeout(() => {
+            if (touchStateRef.current && touchStateRef.current.index === index && touchStateRef.current.activated) {
+                isTouchDragRef.current = true;
+                setDraggingIndex(index);
+                const draggedEl = document.querySelector(`[data-config-index="${index}"]`) as HTMLElement | null;
+                if (draggedEl) {
+                    draggedEl.setAttribute("data-dragging-card", "true");
+                    draggedEl.style.zIndex = "1000";
+                    draggedEl.style.boxShadow = "0 12px 28px rgba(0,0,0,0.25)";
+                }
+                document.body.style.overflow = "hidden";
+                document.body.style.touchAction = "none";
+                if (navigator.vibrate) navigator.vibrate(40);
+            }
+        }, 350);
     };
 
-    const handleTouchEnd = () => {
-        if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
-        if (isTouchDragRef.current && draggingIndex !== null && dragOverIndex !== null) {
-            handleReorder(draggingIndex, dragOverIndex);
-        }
-        setDraggingIndex(null);
-        setDragOverIndex(null);
-        isTouchDragRef.current = false;
-        touchStartPos.current = null;
+    const handleTouchStart = (index: number, e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        if (touch) startDrag(index, touch.clientX, touch.clientY);
+    };
+
+    const handleMouseDown = (index: number, e: React.MouseEvent) => {
+        e.preventDefault();
+        startDrag(index, e.clientX, e.clientY);
     };
 
     const removeConfig = (id: string) => {
@@ -326,31 +416,16 @@ export function ApiSettings() {
                             <div
                                 key={config.id}
                                 data-config-index={index}
-                                draggable
-                                onDragStart={() => setDraggingIndex(index)}
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    if (draggingIndex !== null && draggingIndex !== index) {
-                                        handleReorder(draggingIndex, index);
-                                        setDraggingIndex(index);
-                                    }
-                                }}
-                                onDragEnd={() => {
-                                    setDraggingIndex(null);
-                                    setDragOverIndex(null);
-                                }}
+                                onMouseDown={(e) => handleMouseDown(index, e)}
                                 onTouchStart={(e) => handleTouchStart(index, e)}
-                                onTouchMove={handleTouchMove}
-                                onTouchEnd={handleTouchEnd}
-                                onTouchCancel={handleTouchEnd}
                                 className={`ui-config-card min-w-0 cursor-pointer select-none transition-all ${
                                     isDragging
-                                        ? "opacity-60 scale-105 shadow-xl ring-2 ring-black z-20"
+                                        ? "opacity-50 ring-2 ring-black z-50"
                                         : isDragOver
                                             ? "ring-2 ring-black scale-98 bg-black/5"
                                             : ""
                                 }`}
-                                style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between", touchAction: "manipulation" }}
+                                style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between", touchAction: "manipulation", transition: isDragging ? "none" : "transform 200ms ease, opacity 200ms ease, box-shadow 200ms ease" }}
                                 role="button"
                                 tabIndex={0}
                                 aria-label={`编辑 ${config.name || config.provider}`}
