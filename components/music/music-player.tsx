@@ -459,9 +459,11 @@ export default function MusicPlayer() {
 
     const handleTouchEnd = () => {
         const dy = touchCurrentY.current - touchStartY.current;
-        // 从上往下滑动超过 80px 时退出全屏播放器
-        if (dy > 80) {
+        // 从上往下滑动超过 70px 时收起全屏播放器并退回音乐列表
+        if (dy > 70) {
             player.closeFullPlayer();
+            // 确保音乐 App 界面处于打开状态（停留在音乐列表）
+            window.dispatchEvent(new CustomEvent("open-app", { detail: { appId: "music" } }));
         }
     };
 
