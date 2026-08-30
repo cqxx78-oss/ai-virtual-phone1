@@ -1903,47 +1903,16 @@ export const CALENDAR_CSS_EXAMPLE = `/* ═════════════�
   /* border-radius: 24px; */
 }`;
 
-export const MUSIC_CSS_EXAMPLE = `/* ══════════════════════════════════════════
-   音乐页面自定义样式 — 极光紫夜主题
-   （适配「夜光 Lumen」新版界面）
-   修改后点击「保存」即刻生效
-   清空全部内容保存即恢复默认
-   ══════════════════════════════════════════ */
-
-/* ━━ 全部色彩变量 ━━
-   注：桌面悬浮球(.music-float)与聊天小窗(.mini-app-window)
-   已独立为浅色配色，不受这里的变量影响 */
+export const MUSIC_CSS_EXAMPLE = `/* ── 磨砂灰白 · 极简质感配色变量 ── */
 .music-app,
 .music-player {
-  /* 页面底色 */
-  --c-music-bg: #0c0a1a;
-  /* 背景渐变 · 5 层 */
-  --c-music-bg-mint: rgba(100, 60, 220, 0.35);
-  --c-music-bg-cream: rgba(180, 80, 200, 0.2);
-  --c-music-bg-lime: rgba(60, 120, 255, 0.2);
-  --c-music-bg-mint-dim: rgba(80, 40, 180, 0.25);
-  --c-music-bg-center: rgba(60, 40, 200, 0.3);
-  /* 全屏播放器背景光 */
-  --c-music-bg-glow: rgba(140, 80, 255, 0.15);
-  --c-music-bg-mist: rgba(80, 40, 160, 0.15);
-  /* 玻璃面板 / 边框 / 不透明弹窗 / 极淡装饰 */
-  --c-music-surface: rgba(255, 255, 255, 0.06);
-  --c-music-surface-solid: rgba(255, 255, 255, 0.12);
-  --c-music-panel: rgba(26, 20, 46, 0.96);
-  --c-music-glass-dim: rgba(255, 255, 255, 0.06);
-  /* 文字 / 次级文字 / 纯白 */
+  --c-music-bg: #ececee;
+  --c-music-surface: #ffffff;
+  --c-music-surface-solid: #f5f5f7;
+  --c-music-panel: #ffffff;
   --c-music-white: #ffffff;
-  --c-music-text: #e0d8f0;
-  --c-music-accent: #b49de8;
-  --c-music-accent-dim: rgba(180, 157, 232, 0.12);
-  /* 主强调色（红心/播放全部/榜单序号） */
-  --c-music-primary: #c86bff;
-  --c-music-primary-dim: rgba(200, 107, 255, 0.14);
-  /* 发光歌词月光色 / 光晕 / 遮罩 / 红心 */
-  --c-music-glowtext: #ead8ff;
-  --c-music-gold: rgba(210, 170, 255, 0.4);
-  --c-music-overlay: rgba(0, 0, 0, 0.5);
-  --c-music-liked: #ff5c8a;
+  --c-music-text: #1a1a1a;
+  --c-music-accent: #666666;
 }
 
 /* ━━ 页面整体 ━━ */

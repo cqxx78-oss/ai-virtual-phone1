@@ -81,11 +81,7 @@ export default function MusicApp({ onClose }: Props) {
     const [renameCategoryName, setRenameCategoryName] = useState("");
     const [showSettings, setShowSettings] = useState(false);
     const [showCssEditor, setShowCssEditor] = useState(false);
-    // 长按拖拽排序分组
-    const [dragCat, setDragCat] = useState<string | null>(null);
-    const [dragOverCat, setDragOverCat] = useState<string | null>(null);
-    const dragTimerRef = useRef<number | null>(null);
-    const dragStartYRef = useRef(0);
+
     const [customCss, setCustomCss] = useState("");
     const [activePlaylist, setActivePlaylist] = useState<NeteasePlaylist | null>(null);
     const [dailyView, setDailyView] = useState<NeteaseSearchResult[] | null>(null);
@@ -336,52 +332,7 @@ export default function MusicApp({ onClose }: Props) {
         saveCustomCategories(nextCategories);
     };
 
-    const handleCatPointerDown = (e: React.PointerEvent, catName: string) => {
-        if (catName === UNCATEGORIZED_CATEGORY_ID) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        dragStartYRef.current = e.clientY;
-        if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
-        dragTimerRef.current = window.setTimeout(() => {
-            setDragCat(catName);
-            setDragOverCat(catName);
-            if (typeof window !== "undefined" && window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(50);
-            }
-        }, 350);
-    };
 
-    const handleCatPointerMove = (e: React.PointerEvent) => {
-        if (dragTimerRef.current && Math.abs(e.clientY - dragStartYRef.current) > 8) {
-            window.clearTimeout(dragTimerRef.current);
-            dragTimerRef.current = null;
-        }
-    };
-
-    const handleCatPointerUp = (e: React.PointerEvent) => {
-        if (dragTimerRef.current) {
-            window.clearTimeout(dragTimerRef.current);
-            dragTimerRef.current = null;
-        }
-        if (dragCat) {
-            if (dragOverCat && dragOverCat !== dragCat && dragOverCat !== UNCATEGORIZED_CATEGORY_ID) {
-                const movable = normalizeCategoryOrder(categories, categoryOrder);
-                const fromIdx = movable.indexOf(dragCat);
-                const toIdx = movable.indexOf(dragOverCat);
-                if (fromIdx >= 0 && toIdx >= 0) {
-                    const nextOrder = [...movable];
-                    const [moved] = nextOrder.splice(fromIdx, 1);
-                    nextOrder.splice(toIdx, 0, moved);
-                    const nextCategories = nextOrder.filter(id => id !== UNCATEGORIZED_CATEGORY_ID);
-                    setCategoryOrder(nextOrder);
-                    setCategories(nextCategories);
-                    saveCategoryOrder(nextOrder);
-                    saveCustomCategories(nextCategories);
-                }
-            }
-            setDragCat(null);
-            setDragOverCat(null);
-        }
-    };
 
     const openManagedCategory = (catName: string | null) => {
         setManagedCategory(catName);
@@ -838,35 +789,19 @@ export default function MusicApp({ onClose }: Props) {
                                                 </div>
                                                 <span className="music-category-manager-badge">固定</span>
                                             </div>
-                                            {orderedCategoryTabs.map((cat, idx) => {
-                                                const isDragging = dragCat === cat;
-                                                const isOver = dragOverCat === cat;
-                                                return (
-                                                <div
-                                                    key={cat}
-                                                    className="music-category-manager-row"
-                                                    {...(isDragging ? { "data-dragging": "" } : {})}
-                                                    {...(isOver && dragCat !== cat ? { "data-drag-over": "" } : {})}
-                                                    onPointerDown={e => handleCatPointerDown(e, cat)}
-                                                    onPointerMove={handleCatPointerMove}
-                                                    onPointerUp={handleCatPointerUp}
-                                                    onPointerCancel={handleCatPointerUp}
-                                                    onPointerEnter={() => {
-                                                        if (dragCat && dragCat !== cat && dragTimerRef.current === null) {
-                                                            setDragOverCat(cat);
-                                                        }
-                                                    }}
-                                                >
+                                            {orderedCategoryTabs.map((cat, idx) => (
+                                                <div key={cat} className="music-category-manager-row">
                                                     <button className="music-category-manager-main" onClick={() => cat === UNCATEGORIZED_CATEGORY_ID ? undefined : openManagedCategory(cat)}>
                                                         <span className="music-category-manager-name">{cat === UNCATEGORIZED_CATEGORY_ID ? "未分组" : cat}</span>
                                                         <span className="music-category-manager-count">{cat === UNCATEGORIZED_CATEGORY_ID ? tracks.filter(t => !t.category).length : tracks.filter(t => t.category === cat).length} 首</span>
                                                     </button>
                                                     <div className="music-category-manager-actions">
+                                                        <button title="上移" disabled={idx === 0} onClick={() => handleMoveCategory(cat, -1)}>↑</button>
+                                                        <button title="下移" disabled={idx === orderedCategoryTabs.length - 1} onClick={() => handleMoveCategory(cat, 1)}>↓</button>
                                                         {cat !== UNCATEGORIZED_CATEGORY_ID && <button title="删除" onClick={() => handleDeleteCategory(cat)}>删</button>}
-                                                        <div className="music-category-manager-drag-handle" title="长按拖动排序">≡</div>
                                                     </div>
                                                 </div>
-                                            );})} 
+                                            ))} 
                                         </div>
                                     </div>
                                 </div>
@@ -1642,9 +1577,27 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
         setEditingTrack(null);
     };
 
+    const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
     return (
         <div
             className="music-list"
+            onTouchStart={(e) => {
+                const touch = e.touches[0];
+                touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+            }}
+            onTouchEnd={(e) => {
+                const start = touchStartRef.current;
+                touchStartRef.current = null;
+                if (!start || !onSwipeCategory || e.changedTouches.length === 0) return;
+                const touch = e.changedTouches[0];
+                const dx = touch.clientX - start.x;
+                const dy = touch.clientY - start.y;
+                if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+                    onSwipeCategory(dx < 0 ? 1 : -1);
+                }
+            }}
+            onTouchCancel={() => { touchStartRef.current = null; }}
             onPointerDown={(e) => { swipeRef.current = { x: e.clientX, y: e.clientY }; }}
             onPointerUp={(e) => {
                 const start = swipeRef.current;
@@ -1652,7 +1605,7 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                 if (!start || !onSwipeCategory) return;
                 const dx = e.clientX - start.x;
                 const dy = e.clientY - start.y;
-                if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+                if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
                     onSwipeCategory(dx < 0 ? 1 : -1);
                 }
             }}
@@ -2399,17 +2352,11 @@ function MusicCssEditor({ onClose, onSave }: { onClose: () => void; onSave: (css
                 <div className="music-settings-section music-qr-section">
                     <div className="music-settings-label">我的方案</div>
                     <div className="music-category-manager-list">
-                        <div className="music-category-manager-row" onClick={() => handleApplyScheme("")}>
-                            <div className="music-category-manager-main">
-                                <span className="music-category-manager-name">默认（清空样式）</span>
-                            </div>
-                            <span className="music-category-manager-badge">系统</span>
-                        </div>
                         <div className="music-category-manager-row" onClick={() => handleApplyScheme(MUSIC_CSS_EXAMPLE)}>
                             <div className="music-category-manager-main">
-                                <span className="music-category-manager-name">暗色渐变示例</span>
+                                <span className="music-category-manager-name">简洁磨砂（默认）</span>
                             </div>
-                            <span className="music-category-manager-badge">示例</span>
+                            <span className="music-category-manager-badge">系统</span>
                         </div>
                         {schemes.map(s => (
                             <div key={s.id} className="music-category-manager-row" onClick={() => handleApplyScheme(s.css)}>
