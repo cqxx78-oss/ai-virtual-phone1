@@ -11,14 +11,13 @@ import { extractCoverPalette, DEFAULT_COVER_PALETTE, type CoverPalette } from "@
 import {
     getUserPlaylists, addTracksToPlaylist, removeTracksFromPlaylist, getNeteasePlayInfo,
     isNeteaseConfigured, recordTrackPlaylist, removeTrackPlaylistRecord, getTrackPlaylistId,
-    getSongCommentPage, getNeteaseSongDetail,
+    getNeteaseSongDetail,
     type NeteasePlaylist,
 } from "@/lib/music-service";
 import {
     loadAllTracks, updateTrackMeta, toggleLike,
     type MusicTrack,
 } from "@/lib/music-storage";
-import MusicCommentsPage from "./music-comments";
 import MusicArtistPage from "./music-artist";
 import { loadMusicBg, playerBgStyle, MUSIC_BG_EVENT, type MusicBgConfig } from "@/lib/music-bg";
 
@@ -51,13 +50,6 @@ function waveHeights(seedText: string): number[] {
     return heights;
 }
 
-function formatCount(value: number): string {
-    if (!Number.isFinite(value) || value <= 0) return "";
-    if (value >= 100000000) return `${Math.round(value / 10000000) / 10}亿`;
-    if (value >= 10000) return `${Math.round(value / 1000) / 10}万`;
-    return String(value);
-}
-
 type PlayerStyle = "modern" | "vinyl";
 type BodyView = "cover" | "lyrics";
 
@@ -70,7 +62,6 @@ export default function MusicPlayer() {
     const [playerStyle, setPlayerStyle] = useState<PlayerStyle>(() =>
         (typeof window !== "undefined" && kvGet("music-player-style") === "vinyl") ? "vinyl" : "modern");
     const [showQueue, setShowQueue] = useState(false);
-    const [showComments, setShowComments] = useState(false);
     const [allLocalTracks, setAllLocalTracks] = useState<MusicTrack[]>([]);
 
     const refreshLocalData = useCallback(() => {
@@ -83,7 +74,6 @@ export default function MusicPlayer() {
     const [artistView, setArtistView] = useState<{ id: number; name: string } | null>(null);
     const [palette, setPalette] = useState<CoverPalette>(DEFAULT_COVER_PALETTE);
     const [bgCfg, setBgCfg] = useState<MusicBgConfig>(() => loadMusicBg());
-    const [commentTotal, setCommentTotal] = useState(0);
 
     useEffect(() => {
         const handleBgChange = () => setBgCfg(loadMusicBg());
@@ -177,21 +167,13 @@ export default function MusicPlayer() {
         return () => { cancelled = true; };
     }, [coverUrl]);
 
-    // ── Comment count for current track ──
+    // ── Track id parsing (kept for artist page + Netease branches) ──
     const isNeteaseTrack = player.currentTrack?.id?.startsWith("netease_") ?? false;
     const neteaseId = isNeteaseTrack ? parseInt(player.currentTrack!.id.replace("netease_", ""), 10) : 0;
 
     useEffect(() => {
-        setCommentTotal(0);
-        setShowComments(false);
         setArtistView(null);
-        if (!neteaseId || !isNeteaseConfigured()) return;
-        let cancelled = false;
-        getSongCommentPage(neteaseId, 0, 1).then(page => {
-            if (!cancelled) setCommentTotal(page.total);
-        });
-        return () => { cancelled = true; };
-    }, [neteaseId]);
+    }, [player.currentTrack?.id]);
 
     const getTimeFromEvent = useCallback((clientX: number) => {
         const bar = progressRef.current;
@@ -479,6 +461,22 @@ export default function MusicPlayer() {
                     </button>
                 </div>
                 <div className="mp-top-actions">
+                    <button
+                        className="music-player-ctrl-btn mp-top-btn"
+                        {...(liked ? { "data-liked": "" } : {})}
+                        onClick={handleLike}
+                        title={liked ? "取消喜欢" : "喜欢"}
+                    >
+                        {liked ? (
+                            <svg width="19" height="19" viewBox="0 0 24 24" fill="#ff4757" stroke="#ff4757" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                        ) : (
+                            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                        )}
+                    </button>
                     <button className="music-player-ctrl-btn mp-top-btn" onClick={togglePlayerStyle} title={playerStyle === "vinyl" ? "切换现代样式" : "切换黑胶样式"}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
@@ -635,40 +633,7 @@ export default function MusicPlayer() {
                 </button>
             </div>
 
-            {/* Social row: like / comments / share */}
-            <div className="mp-social">
-                <button className="mp-social-btn" {...(liked ? { "data-liked": "" } : {})} onClick={handleLike}>
-                    {liked ? (
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                        </svg>
-                    ) : (
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                        </svg>
-                    )}
-                    <span>喜欢</span>
-                </button>
-                <button
-                    className="mp-social-btn"
-                    onClick={() => {
-                        if (!isNeteaseTrack) { showMusicToast("本地歌曲暂无评论区"); return; }
-                        setShowComments(true);
-                    }}
-                >
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <path d="M21 12a8.5 8.5 0 0 1-12.4 7.6L4 21l1.5-4.3A8.5 8.5 0 1 1 21 12z" />
-                    </svg>
-                    <span>{commentTotal > 0 ? formatCount(commentTotal) : "评论"}</span>
-                </button>
-                <button className="mp-social-btn" onClick={openShareViaChat}>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                    </svg>
-                    <span>分享</span>
-                </button>
-            </div>
+
 
             {/* 当前播放歌曲所属分组的播放列表（中央弹窗，只读，固定顺序） */}
             {showQueue && (() => {
@@ -778,17 +743,6 @@ export default function MusicPlayer() {
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* Comments overlay */}
-            {showComments && neteaseId > 0 && (
-                <MusicCommentsPage
-                    songId={neteaseId}
-                    title={track.title}
-                    artist={track.artist}
-                    coverUrl={track.coverUrl}
-                    onClose={() => setShowComments(false)}
-                />
             )}
 
             {/* Artist overlay */}
