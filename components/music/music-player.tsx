@@ -4,6 +4,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { useMusicPlayer, type PlayMode } from "@/lib/music-context";
 import { scrollElementWithinContainer } from "@/lib/dom-scroll";
 import { kvGet, kvSet } from "@/lib/kv-db";
@@ -74,27 +75,29 @@ export default function MusicPlayer() {
         if (showQueue) refreshLocalData();
     }, [showQueue, refreshLocalData]);
 
-    // 物理返回键 / 侧滑手势：全屏播放器打开时优先收起全屏播放器，退回到音乐列表
+    // 物理返回键：全屏播放器挂载时自动入栈一层，出栈时关闭播放器退回音乐列表
     useEffect(() => {
-        const prevHandler = (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler;
-        (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = () => {
-            // 如果有弹窗打开，先关弹窗
-            if (showQueue) {
-                setShowQueue(false);
-                return true;
-            }
-            if (artistView) {
-                setArtistView(null);
-                return true;
-            }
-            // 否则收起全屏播放器
+        return pushNav(() => {
             player.closeFullPlayer();
-            return true;
-        };
-        return () => {
-            (window as unknown as { __phoneBackHandler?: () => boolean }).__phoneBackHandler = prevHandler;
-        };
-    }, [player, showQueue, artistView]);
+        }, "music:player");
+    }, [player]);
+
+    // 播放列表弹窗与歌手页入栈
+    useEffect(() => {
+        if (showQueue) {
+            return pushNav(() => {
+                setShowQueue(false);
+            }, "music:playerQueue");
+        }
+    }, [showQueue]);
+
+    useEffect(() => {
+        if (artistView) {
+            return pushNav(() => {
+                setArtistView(null);
+            }, "music:artistView");
+        }
+    }, [artistView]);
     const [palette, setPalette] = useState<CoverPalette>(DEFAULT_COVER_PALETTE);
     const [bgCfg, setBgCfg] = useState<MusicBgConfig>(() => loadMusicBg());
 
@@ -441,8 +444,35 @@ export default function MusicPlayer() {
         ...(customBg || {}),
     } as React.CSSProperties;
 
+    // 下滑退出手势支持
+    const touchStartY = useRef(0);
+    const touchCurrentY = useRef(0);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartY.current = e.touches[0].clientY;
+        touchCurrentY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        touchCurrentY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = () => {
+        const dy = touchCurrentY.current - touchStartY.current;
+        // 从上往下滑动超过 80px 时退出全屏播放器
+        if (dy > 80) {
+            player.closeFullPlayer();
+        }
+    };
+
     return (
-        <div className="music-player mp-lumen" style={ambientVars}>
+        <div
+            className="music-player mp-lumen"
+            style={ambientVars}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
             {musicToast && (
                 <div className="music-toast-overlay">
                     <div className="music-toast-chip">

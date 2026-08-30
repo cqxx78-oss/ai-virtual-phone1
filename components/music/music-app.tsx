@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import {
     loadAllTracks, saveTrack, deleteTrack, updateTrackMeta,
     generateTrackId, parseFilename, getAudioDuration,
@@ -351,6 +352,23 @@ export default function MusicApp({ onClose }: Props) {
         const sec = Math.floor(s % 60);
         return `${m}:${sec.toString().padStart(2, "0")}`;
     };
+
+    // 音乐 App 子页面（每日推荐、歌单详情）各进一层导航栈
+    useEffect(() => {
+        if (dailyView) {
+            return pushNav(() => {
+                setDailyView(null);
+            }, "music:dailyView");
+        }
+    }, [dailyView]);
+
+    useEffect(() => {
+        if (activePlaylist) {
+            return pushNav(() => {
+                setActivePlaylist(null);
+            }, `music:playlist:${activePlaylist.id}`);
+        }
+    }, [activePlaylist]);
 
     const onSettingsSaved = () => {
         const neteaseOk = isNeteaseConfigured();
