@@ -30,7 +30,7 @@ import {
   type DiaryCustomFont,
 } from "@/lib/diary-entry-storage";
 import type { DiaryEntry, DiaryEntryBlock, DiaryEntryTimerSettings, DiaryEntryTrigger } from "@/lib/diary-entry-types";
-import { getThemeAssetDataUrl, saveThemeAssetFromBlob } from "@/lib/theme-storage";
+import { getThemeAssetDataUrl, getThemeAssetMap, saveThemeAssetFromBlob } from "@/lib/theme-storage";
 
 const DIARY_USER_FONT_STYLE_ID = "ai-phone-diary-entry-user-font-face";
 
@@ -166,25 +166,19 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
     setEntries(loadDiaryEntries());
   }, []);
 
-  // 加载并注入所有自定义上传的字体
+  // 批量并发秒级直读所有自定义上传字体
   useEffect(() => {
     let cancelled = false;
-    const allAssetIds = new Set<string>();
-    if (diaryFontAssetId) allAssetIds.add(diaryFontAssetId);
-    customFonts.forEach(f => { if (f.assetId) allAssetIds.add(f.assetId); });
+    const allAssetIds = Array.from(new Set([
+      diaryFontAssetId,
+      ...customFonts.map(f => f.assetId),
+    ].filter((id): id is string => Boolean(id))));
 
-    Promise.all(Array.from(allAssetIds).map(async (assetId) => {
-      try {
-        const dataUrl = await getThemeAssetDataUrl(assetId);
-        return { assetId, dataUrl };
-      } catch {
-        return { assetId, dataUrl: null };
-      }
-    })).then((results) => {
+    if (allAssetIds.length === 0) return;
+
+    void getThemeAssetMap(allAssetIds).then((map) => {
       if (cancelled) return;
-      const map: Record<string, string> = {};
-      results.forEach(r => { if (r.dataUrl) map[r.assetId] = r.dataUrl; });
-      setCustomFontUrls(map);
+      setCustomFontUrls(prev => ({ ...prev, ...map }));
     });
     return () => { cancelled = true; };
   }, [diaryFontAssetId, customFonts]);
