@@ -200,33 +200,15 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         setActiveTab("messages");
     };
 
-    const historyPushedRef = useRef(false);
-
-    useEffect(() => {
-        const isRoomOpen = !!activeSession || activeMascot;
-        if (isRoomOpen && !historyPushedRef.current) {
-            window.history.pushState({ chatRoomOpen: true }, "");
-            historyPushedRef.current = true;
-        }
-    }, [activeSession, activeMascot]);
-
-    useEffect(() => {
-        const handlePopState = () => {
-            if (historyPushedRef.current) {
-                historyPushedRef.current = false;
-                setActiveSession(null);
-                setActiveMascot(false);
-            }
-        };
-        window.addEventListener("popstate", handlePopState);
-        return () => window.removeEventListener("popstate", handlePopState);
-    }, []);
-
-    // 注册全局返回键处理器：聊天内的"应用根级"子状态（联系人添加面板、CSS 编辑器等
-    // 临时子页）优先消化；聊天室本身已有自己的 pushState/popstate 监听器，
-    // 桌面在询问我们之前那次 popstate 已被聊天室消化，这里只需兜底。
+    // 注册全局返回键处理器：统一由桌面中央历史栈调度
+    // 优先层级：1. 退出聊天室/桌宠；2. 关闭联系人添加弹层；3. 退出全屏 CSS 编辑器等子页面。
     useEffect(() => {
         const canHandle = () => {
+            if (activeSession || activeMascot) {
+                setActiveSession(null);
+                setActiveMascot(false);
+                return true;
+            }
             if (pendingAddContactId) {
                 setPendingAddContactId(null);
                 return true;
@@ -242,15 +224,11 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
             const w = window as unknown as { __phoneBackHandler?: () => boolean };
             if (w.__phoneBackHandler === canHandle) delete w.__phoneBackHandler;
         };
-    }, [hideTabBar, pendingAddContactId]);
+    }, [activeSession, activeMascot, hideTabBar, pendingAddContactId]);
 
     const handleRoomBack = useCallback(() => {
-        if (historyPushedRef.current) {
-            window.history.back();
-        } else {
-            setActiveSession(null);
-            setActiveMascot(false);
-        }
+        setActiveSession(null);
+        setActiveMascot(false);
     }, []);
 
     // Listen for CSS updates from settings panel
