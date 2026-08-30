@@ -320,6 +320,7 @@ export default function MusicPlayer() {
         // 如果是本地音乐，直接更新本地 DB 里的 liked 状态
         if (!isNeteaseTrack) {
             await updateTrackMeta(player.currentTrack.id, { liked: newLiked });
+            window.dispatchEvent(new Event("music-library-updated"));
             showMusicToast(newLiked ? "已加入喜欢" : "已取消喜欢");
             return;
         }

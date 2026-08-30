@@ -39,6 +39,32 @@ type TabId = "recommend" | "mine" | "search" | "local";
 
 /** 分组 Tab id：内置用固定字面量，自定义分组直接用其名称作为 id */
 type CategoryTabId = "favorites" | "uncategorized" | string;
+const MUSIC_CATEGORY_ORDER_KEY = "ai_phone_music_category_order_v1";
+const UNCATEGORIZED_CATEGORY_ID = "uncategorized";
+
+function normalizeCategoryOrder(categories: string[], stored?: string[] | null): string[] {
+    const allowed = new Set([UNCATEGORIZED_CATEGORY_ID, ...categories]);
+    const base = Array.isArray(stored) ? stored.filter(id => allowed.has(id)) : [];
+    const result = base.length > 0 ? [...base] : [UNCATEGORIZED_CATEGORY_ID, ...categories];
+    if (!result.includes(UNCATEGORIZED_CATEGORY_ID)) result.unshift(UNCATEGORIZED_CATEGORY_ID);
+    for (const cat of categories) {
+        if (!result.includes(cat)) result.push(cat);
+    }
+    return result.filter((id, idx, arr) => arr.indexOf(id) === idx);
+}
+
+function loadCategoryOrder(categories: string[]): string[] {
+    try {
+        const raw = kvGet(MUSIC_CATEGORY_ORDER_KEY);
+        return normalizeCategoryOrder(categories, raw ? JSON.parse(raw) : null);
+    } catch {
+        return normalizeCategoryOrder(categories, null);
+    }
+}
+
+function saveCategoryOrder(order: string[]): void {
+    try { kvSet(MUSIC_CATEGORY_ORDER_KEY, JSON.stringify(order)); } catch { /* ignore */ }
+}
 
 export default function MusicApp({ onClose }: Props) {
     const [tracks, setTracks] = useState<MusicTrack[]>([]);
@@ -48,6 +74,7 @@ export default function MusicApp({ onClose }: Props) {
     // 分组 Tab：默认收藏；分组列表与自定义分类共同持久化
     const [activeCategory, setActiveCategory] = useState<CategoryTabId>("favorites");
     const [categories, setCategories] = useState<string[]>(() => loadCustomCategories());
+    const [categoryOrder, setCategoryOrder] = useState<string[]>(() => loadCategoryOrder(loadCustomCategories()));
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [managedCategory, setManagedCategory] = useState<string | null>(null);
     const [newCategoryName, setNewCategoryName] = useState("");
@@ -217,10 +244,19 @@ export default function MusicApp({ onClose }: Props) {
     const handleUpdateTrack = async (trackId: string, updates: Partial<MusicTrack>) => {
         await updateTrackMeta(trackId, updates);
         setTracks(prev => prev.map(t => t.id === trackId ? { ...t, ...updates } : t));
+        window.dispatchEvent(new Event("music-library-updated"));
         // 如果当前播放列表里有这首歌，只静默更新其元数据，不重新触发播放
         if (player.queue.some(t => t.id === trackId)) {
             player.setQueue(player.queue.map(t => t.id === trackId ? { ...t, ...updates } : t));
         }
+    };
+
+    const handleToggleLocalLike = async (trackId: string) => {
+        const target = tracks.find(t => t.id === trackId);
+        if (!target) return;
+        const liked = !target.liked;
+        await handleUpdateTrack(trackId, { liked });
+        showMusicToast(liked ? "已加入喜欢" : "已取消喜欢");
     };
 
     // ── 分组管理 ──
@@ -232,8 +268,11 @@ export default function MusicApp({ onClose }: Props) {
             return;
         }
         const next = [...categories, name];
+        const nextOrder = normalizeCategoryOrder(next, [...categoryOrder, name]);
         setCategories(next);
+        setCategoryOrder(nextOrder);
         saveCustomCategories(next);
+        saveCategoryOrder(nextOrder);
         setNewCategoryName("");
         setActiveCategory(name);
         showMusicToast(`已创建分组「${name}」`);
@@ -244,8 +283,11 @@ export default function MusicApp({ onClose }: Props) {
             void updateTrackMeta(t.id, { category: undefined });
         });
         const next = categories.filter(c => c !== catName);
+        const nextOrder = categoryOrder.filter(id => id !== catName);
         setCategories(next);
+        setCategoryOrder(nextOrder);
         saveCustomCategories(next);
+        saveCategoryOrder(nextOrder);
         setTracks(prev => prev.map(t => t.category === catName ? { ...t, category: undefined } : t));
         if (activeCategory === catName) setActiveCategory("uncategorized");
         if (managedCategory === catName) setManagedCategory(null);
@@ -260,8 +302,11 @@ export default function MusicApp({ onClose }: Props) {
             return;
         }
         const next = categories.map(c => c === oldName ? name : c);
+        const nextOrder = categoryOrder.map(id => id === oldName ? name : id);
         setCategories(next);
+        setCategoryOrder(nextOrder);
         saveCustomCategories(next);
+        saveCategoryOrder(nextOrder);
         setTracks(prev => prev.map(t => t.category === oldName ? { ...t, category: name } : t));
         tracks.filter(t => t.category === oldName).forEach(t => {
             void updateTrackMeta(t.id, { category: name });
@@ -273,13 +318,17 @@ export default function MusicApp({ onClose }: Props) {
     };
 
     const handleMoveCategory = (catName: string, direction: -1 | 1) => {
-        const index = categories.indexOf(catName);
+        const movable = normalizeCategoryOrder(categories, categoryOrder);
+        const index = movable.indexOf(catName);
         const targetIndex = index + direction;
-        if (index < 0 || targetIndex < 0 || targetIndex >= categories.length) return;
-        const next = [...categories];
-        [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-        setCategories(next);
-        saveCustomCategories(next);
+        if (index < 0 || targetIndex < 0 || targetIndex >= movable.length) return;
+        const nextOrder = [...movable];
+        [nextOrder[index], nextOrder[targetIndex]] = [nextOrder[targetIndex], nextOrder[index]];
+        const nextCategories = nextOrder.filter(id => id !== UNCATEGORIZED_CATEGORY_ID);
+        setCategoryOrder(nextOrder);
+        setCategories(nextCategories);
+        saveCategoryOrder(nextOrder);
+        saveCustomCategories(nextCategories);
     };
 
     const openManagedCategory = (catName: string | null) => {
@@ -295,10 +344,14 @@ export default function MusicApp({ onClose }: Props) {
         const normalized = !catName || catName === "favorites" || catName === "uncategorized" ? undefined : catName;
         await updateTrackMeta(trackId, { category: normalized });
         setTracks(prev => prev.map(t => t.id === trackId ? { ...t, category: normalized } : t));
+        window.dispatchEvent(new Event("music-library-updated"));
         if (player.queue.some(t => t.id === trackId)) {
             player.setQueue(player.queue.map(t => t.id === trackId ? { ...t, category: normalized } : t));
         }
     };
+
+    const orderedCategoryTabs = useMemo(() => normalizeCategoryOrder(categories, categoryOrder), [categories, categoryOrder]);
+    const allCategoryTabs = useMemo<CategoryTabId[]>(() => ["favorites", ...orderedCategoryTabs], [orderedCategoryTabs]);
 
     // 当前分组 Tab 下要展示的本地歌曲（按当前分组筛选）
     const visibleTracks = useMemo(() => {
@@ -306,6 +359,13 @@ export default function MusicApp({ onClose }: Props) {
         if (activeCategory === "uncategorized") return tracks.filter(t => !t.category);
         return tracks.filter(t => t.category === activeCategory);
     }, [tracks, activeCategory]);
+
+    const switchCategoryByOffset = useCallback((offset: -1 | 1) => {
+        const index = allCategoryTabs.indexOf(activeCategory);
+        if (index < 0) return;
+        const next = allCategoryTabs[index + offset];
+        if (next) setActiveCategory(next);
+    }, [activeCategory, allCategoryTabs]);
 
     /** Convert NeteaseSearchResult → MusicTrack */
     const toMusicTrack = useCallback((r: NeteaseSearchResult, extra?: { lyrics?: string; coverUrl?: string; name?: string; artists?: string }): MusicTrack => ({
@@ -531,21 +591,14 @@ export default function MusicApp({ onClose }: Props) {
                         >
                             <span className="music-cat-tab-heart">♥</span> 收藏 <i>({tracks.filter(t => t.liked).length})</i>
                         </button>
-                        <button
-                            className="music-cat-tab"
-                            {...(activeCategory === "uncategorized" ? { "data-active": "" } : {})}
-                            onClick={() => setActiveCategory("uncategorized")}
-                        >
-                            未分组 <i>({tracks.filter(t => !t.category).length})</i>
-                        </button>
-                        {categories.map(cat => (
+                        {orderedCategoryTabs.map(cat => (
                             <button
                                 key={cat}
                                 className="music-cat-tab"
                                 {...(activeCategory === cat ? { "data-active": "" } : {})}
                                 onClick={() => setActiveCategory(cat)}
                             >
-                                {cat} <i>({tracks.filter(t => t.category === cat).length})</i>
+                                {cat === "uncategorized" ? "未分组" : cat} <i>({cat === "uncategorized" ? tracks.filter(t => !t.category).length : tracks.filter(t => t.category === cat).length})</i>
                             </button>
                         ))}
                     </div>
@@ -574,9 +627,9 @@ export default function MusicApp({ onClose }: Props) {
                             onDelete={handleDelete}
                             onPlay={handlePlay}
                             onUpdateTrack={handleUpdateTrack}
-                            showCategoryMenu
                             categories={categories}
-                            onAssignCategory={handleAssignCategory}
+                            onToggleLike={handleToggleLocalLike}
+                            onSwipeCategory={switchCategoryByOffset}
                         />
                     )}
                 </>
@@ -725,35 +778,24 @@ export default function MusicApp({ onClose }: Props) {
                                     </div>
 
                                     <div className="music-settings-section music-qr-section">
-                                        <div className="music-settings-label">分组列表</div>
-                                        <div className="music-settings-hint">可调整顺序、改名、删除分组；收藏和未分组为系统分组，不可编辑。</div>
                                         <div className="music-category-manager-list">
-                                            <div className="music-category-manager-row" data-fixed="">
+                                            <div className="music-category-manager-row music-category-manager-row-favorite" data-fixed="">
                                                 <div className="music-category-manager-main">
                                                     <span className="music-category-manager-name">♥ 收藏</span>
                                                     <span className="music-category-manager-count">{tracks.filter(t => t.liked).length} 首</span>
                                                 </div>
-                                                <span className="music-category-manager-badge">系统</span>
+                                                <span className="music-category-manager-badge">固定</span>
                                             </div>
-                                            <div className="music-category-manager-row" data-fixed="">
-                                                <div className="music-category-manager-main">
-                                                    <span className="music-category-manager-name">未分组</span>
-                                                    <span className="music-category-manager-count">{tracks.filter(t => !t.category).length} 首</span>
-                                                </div>
-                                                <span className="music-category-manager-badge">系统</span>
-                                            </div>
-                                            {categories.length === 0 ? (
-                                                <div className="music-category-manager-empty">还没有自定义分组</div>
-                                            ) : categories.map((cat, idx) => (
-                                                <div key={cat} className="music-category-manager-row">
-                                                    <button className="music-category-manager-main" onClick={() => openManagedCategory(cat)}>
-                                                        <span className="music-category-manager-name">{cat}</span>
-                                                        <span className="music-category-manager-count">{tracks.filter(t => t.category === cat).length} 首</span>
+                                            {orderedCategoryTabs.map((cat, idx) => (
+                                                <div key={cat} className="music-category-manager-row" draggable onDragStart={e => e.dataTransfer.setData('text/plain', cat)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const from = e.dataTransfer.getData('text/plain'); const fromIdx = orderedCategoryTabs.indexOf(from); const toIdx = orderedCategoryTabs.indexOf(cat); if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return; const nextOrder = [...orderedCategoryTabs]; const [moved] = nextOrder.splice(fromIdx, 1); nextOrder.splice(toIdx, 0, moved); setCategoryOrder(nextOrder); setCategories(nextOrder.filter(id => id !== UNCATEGORIZED_CATEGORY_ID)); saveCategoryOrder(nextOrder); saveCustomCategories(nextOrder.filter(id => id !== UNCATEGORIZED_CATEGORY_ID)); }}>
+                                                    <button className="music-category-manager-main" onClick={() => cat === UNCATEGORIZED_CATEGORY_ID ? undefined : openManagedCategory(cat)}>
+                                                        <span className="music-category-manager-name">{cat === UNCATEGORIZED_CATEGORY_ID ? "未分组" : cat}</span>
+                                                        <span className="music-category-manager-count">{cat === UNCATEGORIZED_CATEGORY_ID ? tracks.filter(t => !t.category).length : tracks.filter(t => t.category === cat).length} 首</span>
                                                     </button>
                                                     <div className="music-category-manager-actions">
                                                         <button title="上移" disabled={idx === 0} onClick={() => handleMoveCategory(cat, -1)}>↑</button>
-                                                        <button title="下移" disabled={idx === categories.length - 1} onClick={() => handleMoveCategory(cat, 1)}>↓</button>
-                                                        <button title="删除" onClick={() => handleDeleteCategory(cat)}>删</button>
+                                                        <button title="下移" disabled={idx === orderedCategoryTabs.length - 1} onClick={() => handleMoveCategory(cat, 1)}>↓</button>
+                                                        {cat !== UNCATEGORIZED_CATEGORY_ID && <button title="删除" onClick={() => handleDeleteCategory(cat)}>删</button>}
                                                     </div>
                                                 </div>
                                             ))}
@@ -1476,16 +1518,16 @@ function NeteaseSongRow({ song, index, formatTime, onPlay }: {
 }
 
 // ── Song List (local) ──
-function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack, showCategoryMenu, categories, onAssignCategory }: {
+function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack, categories, onToggleLike, onSwipeCategory }: {
     tracks: MusicTrack[];
     player: MusicControlsValue;
     formatTime: (s: number) => string;
     onDelete: (id: string, e: React.MouseEvent) => void;
     onPlay: (t: MusicTrack) => void;
     onUpdateTrack: (id: string, updates: Partial<MusicTrack>) => void;
-    showCategoryMenu?: boolean;
     categories?: string[];
-    onAssignCategory?: (trackId: string, category: string | undefined) => void;
+    onToggleLike?: (trackId: string) => void;
+    onSwipeCategory?: (offset: -1 | 1) => void;
 }) {
     const [deleteTarget, setDeleteTarget] = useState<MusicTrack | null>(null);
     const [editingTrack, setEditingTrack] = useState<MusicTrack | null>(null);
@@ -1494,8 +1536,9 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
     const [editAlbum, setEditAlbum] = useState("");
     const [editLyrics, setEditLyrics] = useState("");
     const [editCover, setEditCover] = useState<string | undefined>(undefined);
+    const [editCategory, setEditCategory] = useState<string | undefined>(undefined);
     const coverFileRef = useRef<HTMLInputElement>(null);
-    const [assignTarget, setAssignTarget] = useState<MusicTrack | null>(null);
+    const swipeRef = useRef<{ x: number; y: number } | null>(null);
 
     const startEditing = (t: MusicTrack, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -1505,6 +1548,7 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
         setEditAlbum(t.album || "");
         setEditLyrics(t.lyrics || "");
         setEditCover(t.coverUrl);
+        setEditCategory(t.category);
     };
 
     const handleCoverChange = async (files: FileList | null) => {
@@ -1525,12 +1569,27 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
             album: editAlbum.trim() || undefined,
             lyrics: editLyrics.trim() || undefined,
             coverUrl: editCover,
+            category: editCategory,
         });
         setEditingTrack(null);
     };
 
     return (
-        <div className="music-list">
+        <div
+            className="music-list"
+            onPointerDown={(e) => { swipeRef.current = { x: e.clientX, y: e.clientY }; }}
+            onPointerUp={(e) => {
+                const start = swipeRef.current;
+                swipeRef.current = null;
+                if (!start || !onSwipeCategory) return;
+                const dx = e.clientX - start.x;
+                const dy = e.clientY - start.y;
+                if (Math.abs(dx) > 72 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+                    onSwipeCategory(dx < 0 ? 1 : -1);
+                }
+            }}
+            onPointerCancel={() => { swipeRef.current = null; }}
+        >
             {tracks.map((track, idx) => {
                 const isCurrent = player.currentTrack?.id === track.id;
                 return (
@@ -1553,13 +1612,13 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                         </div>
                         <div className="music-song-duration">{formatTime(track.duration)}</div>
                         <div className="music-song-actions">
-                            {showCategoryMenu && onAssignCategory && (
-                                <button className="music-song-action-btn" title="加入分组" onClick={(e) => { e.stopPropagation(); setAssignTarget(track); }}>
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M3 5h7l2 2h9v12H3z" />
-                                    </svg>
-                                </button>
-                            )}
+                            <button className="music-song-action-btn" title={track.liked ? "取消喜欢" : "喜欢"} {...(track.liked ? { "data-liked": "" } : {})} onClick={(e) => { e.stopPropagation(); onToggleLike?.(track.id); }}>
+                                {track.liked ? (
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+                                ) : (
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+                                )}
+                            </button>
                             <button className="music-song-action-btn" title="编辑信息与歌词" onClick={(e) => startEditing(track, e)}>
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
@@ -1594,14 +1653,27 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                                         {editCover ? <img src={editCover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, color: 'var(--c-music-accent)' }}>无封面</span>}
                                     </div>
                                     <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={e => handleCoverChange(e.target.files)} />
-                                    <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '5px 12px', height: 32 }} onClick={() => coverFileRef.current?.click()}>
-                                        更换封面
-                                    </button>
-                                    {editCover && (
-                                        <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '5px 12px', height: 32 }} onClick={() => setEditCover(undefined)}>
-                                            移除
-                                        </button>
-                                    )}
+                                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '5px 12px', height: 32 }} onClick={() => coverFileRef.current?.click()}>
+                                                更换封面
+                                            </button>
+                                            {editCover && (
+                                                <button className="music-settings-btn" style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '5px 12px', height: 32 }} onClick={() => setEditCover(undefined)}>
+                                                    移除
+                                                </button>
+                                            )}
+                                        </div>
+                                        <select
+                                            className="music-settings-input"
+                                            style={{ height: 32, fontSize: 'calc(11px*var(--app-text-scale,1))', padding: '0 10px' }}
+                                            value={editCategory || ""}
+                                            onChange={e => setEditCategory(e.target.value || undefined)}
+                                        >
+                                            <option value="">未分组</option>
+                                            {(categories || []).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <div className="music-settings-section" style={{ gap: 4 }}>
@@ -1649,58 +1721,6 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                                 <button className="music-settings-btn" onClick={() => setDeleteTarget(null)}>取消</button>
                                 <button className="music-settings-btn music-settings-btn-danger" onClick={(e) => { onDelete(deleteTarget.id, e); setDeleteTarget(null); }}>删除</button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 加入分组弹窗 */}
-            {assignTarget && categories && onAssignCategory && (
-                <div className="music-settings-modal-overlay" onClick={() => setAssignTarget(null)}>
-                    <div className="music-cat-modal-dialog" onClick={e => e.stopPropagation()}>
-                        <div className="music-cat-modal-header">
-                            <h2>选择分组</h2>
-                            <button className="music-settings-close" onClick={() => setAssignTarget(null)}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                            </button>
-                        </div>
-                        <div className="music-cat-modal-body">
-                            <div className="music-cat-modal-header" style={{ padding: '0 0 6px', borderBottom: 'none', flexShrink: 0 }}>
-                                <span style={{ fontSize: 'calc(11px*var(--app-text-scale,1))', color: 'var(--c-music-accent)' }}>{assignTarget.title}</span>
-                            </div>
-                            {categories.length === 0 ? (
-                                <div className="music-cat-row-empty">还没有自定义分组，请先在顶部点击 + 新建</div>
-                            ) : (
-                                <>
-                                    <button
-                                        className="music-cat-row"
-                                        {...(!assignTarget.category ? { "data-current": "" } : {})}
-                                        onClick={() => { onAssignCategory(assignTarget.id, undefined); setAssignTarget(null); }}
-                                    >
-                                        <span className="music-cat-row-name">未分组</span>
-                                        {!assignTarget.category && (
-                                            <span className="music-cat-row-check" aria-hidden="true">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                            </span>
-                                        )}
-                                    </button>
-                                    {categories.map(cat => (
-                                        <button
-                                            key={cat}
-                                            className="music-cat-row"
-                                            {...(assignTarget.category === cat ? { "data-current": "" } : {})}
-                                            onClick={() => { onAssignCategory(assignTarget.id, cat); setAssignTarget(null); }}
-                                        >
-                                            <span className="music-cat-row-name">{cat}</span>
-                                            {assignTarget.category === cat && (
-                                                <span className="music-cat-row-check" aria-hidden="true">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                </span>
-                                            )}
-                                        </button>
-                                    ))}
-                                </>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -2178,78 +2198,6 @@ function MusicSettingsTab({ onBack, onSaved }: { onBack: () => void; onSaved: ()
             </div>
 
             <div className="music-settings-body">
-                <div className="music-settings-section">
-                    <div className="music-settings-label">网易云 API 地址</div>
-                    <div className="music-settings-hint">默认使用公共服务，也可以改成自己的 NeteaseCloudMusicApi 地址</div>
-                    <input
-                        className="music-settings-input"
-                        placeholder="https://your-api.vercel.app"
-                        value={config.baseUrl}
-                        onChange={(e) => setConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
-                    />
-                </div>
-
-                <div className="music-settings-actions">
-                    <button className="music-settings-btn" onClick={handleTest} disabled={testing || !config.baseUrl.trim()}>
-                        {testing ? "测试中..." : "测试连接"}
-                    </button>
-                    <button className="music-settings-btn music-settings-btn-primary" onClick={handleSave}>
-                        保存
-                    </button>
-                </div>
-
-                {testResult && (
-                    <div className={`music-settings-result ${testResult.ok ? "music-settings-result-ok" : "music-settings-result-err"}`}>
-                        {testResult.ok ? "✓ " : "✗ "}{testResult.message}
-                    </div>
-                )}
-
-                {/* QR Login Section */}
-                {config.baseUrl.trim() && (
-                    <div className="music-settings-section music-qr-section">
-                        <div className="music-settings-label">网易云账号登录</div>
-                        <div className="music-settings-hint">登录后可播放 VIP 歌曲（需扫码）</div>
-
-                        {loginNickname ? (
-                            <div className="music-qr-logged">
-                                <span className="music-qr-nickname">{loginNickname}</span>
-                                <span className="music-qr-badge">已登录</span>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="music-settings-actions" style={{ marginTop: '8px' }}>
-                                    <button
-                                        className="music-settings-btn"
-                                        onClick={startQrLogin}
-                                        disabled={qrPolling}
-                                    >
-                                        {qrPolling ? "等待扫码中..." : "扫码登录"}
-                                    </button>
-                                </div>
-
-                                {qrImg && (
-                                    <div className="music-qr-wrap">
-                                        <img src={qrImg} alt="QR Code" className="music-qr-img" />
-                                    </div>
-                                )}
-                            </>
-                        )}
-
-                        {qrStatus && <div className="music-qr-status">{qrStatus}</div>}
-                    </div>
-                )}
-
-                {loginNickname && (
-                    <div className="music-settings-actions" style={{ marginTop: 20 }}>
-                        <button
-                            className="music-settings-btn"
-                            onClick={handleLogout}
-                        >
-                            退出登录
-                        </button>
-                    </div>
-                )}
-
                 {/* Custom backgrounds: app pages + player page */}
                 <div className="music-settings-section music-qr-section">
                     <div className="music-settings-label">App 页面背景</div>

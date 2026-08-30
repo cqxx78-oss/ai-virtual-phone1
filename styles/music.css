@@ -529,6 +529,15 @@
     color: var(--c-music-accent);
 }
 
+.music-song-action-btn[data-liked] {
+    color: #ff4757;
+}
+
+.music-song-action-btn[data-liked]:active {
+    color: #ff4757;
+    background: rgba(255, 71, 87, 0.12);
+}
+
 /* ── Now Playing Indicator (sound wave bars) ── */
 
 .music-wave {
@@ -2058,6 +2067,15 @@
 
 .music-category-manager-row[data-fixed] {
     opacity: 0.85;
+}
+
+.music-category-manager-row-favorite {
+    background: linear-gradient(135deg, rgba(255, 71, 87, 0.14), rgba(255, 255, 255, 0.72));
+    border-color: rgba(255, 71, 87, 0.24);
+}
+
+.music-category-manager-row-favorite .music-category-manager-name {
+    color: #ff4757;
 }
 
 .music-category-manager-main {
