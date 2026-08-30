@@ -720,7 +720,7 @@ export default function MusicPlayer() {
 
                 return (
                     <div className="music-settings-modal-overlay" onClick={() => setShowQueue(false)}>
-                        <div className="music-settings-modal-dialog" style={{ maxWidth: 350, maxHeight: '78vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                        <div className="music-settings-modal-dialog" style={{ width: '85%', maxWidth: 350, height: '80%', maxHeight: 680, display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
                             <div className="music-settings-header" style={{ padding: '16px 18px 10px' }}>
                                 <h2 style={{ fontSize: 'calc(14px*var(--app-text-scale,1))', fontWeight: 600 }}>「{groupLabel}」分组</h2>
                                 <button className="music-settings-close" onClick={() => setShowQueue(false)}>

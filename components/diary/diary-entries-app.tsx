@@ -1054,12 +1054,16 @@ function DiaryEntryFontPanel({
   const [tab, setTab] = useState<"character" | "manage">("character");
 
   const allFontOptions = useMemo(() => {
-    const options: { id: string; name: string }[] = [
-      ...PRESET_DIARY_FONTS.map(p => ({ id: p.id, name: p.name })),
-      ...customFonts.map(c => ({ id: c.id, name: c.name })),
+    const options: { id: string; name: string; family: string }[] = [
+      ...PRESET_DIARY_FONTS.map(p => ({ id: p.id, name: p.name, family: p.family })),
+      ...customFonts.map(c => ({ id: c.id, name: c.name, family: `"AIPhoneDiaryFont_${c.id}", "NoteWall Ximai", var(--app-font-family)` })),
     ];
     return options;
   }, [customFonts]);
+
+  const fontFamilyById = useMemo(() => {
+    return new Map(allFontOptions.map(font => [font.id, font.family]));
+  }, [allFontOptions]);
 
   return (
     <div className="nw-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>

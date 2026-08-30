@@ -81,6 +81,11 @@ export default function MusicApp({ onClose }: Props) {
     const [renameCategoryName, setRenameCategoryName] = useState("");
     const [showSettings, setShowSettings] = useState(false);
     const [showCssEditor, setShowCssEditor] = useState(false);
+    // 长按拖拽排序分组
+    const [dragCat, setDragCat] = useState<string | null>(null);
+    const [dragOverCat, setDragOverCat] = useState<string | null>(null);
+    const dragTimerRef = useRef<number | null>(null);
+    const dragStartYRef = useRef(0);
     const [customCss, setCustomCss] = useState("");
     const [activePlaylist, setActivePlaylist] = useState<NeteasePlaylist | null>(null);
     const [dailyView, setDailyView] = useState<NeteaseSearchResult[] | null>(null);
@@ -329,6 +334,53 @@ export default function MusicApp({ onClose }: Props) {
         setCategories(nextCategories);
         saveCategoryOrder(nextOrder);
         saveCustomCategories(nextCategories);
+    };
+
+    const handleCatPointerDown = (e: React.PointerEvent, catName: string) => {
+        if (catName === UNCATEGORIZED_CATEGORY_ID) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragStartYRef.current = e.clientY;
+        if (dragTimerRef.current) window.clearTimeout(dragTimerRef.current);
+        dragTimerRef.current = window.setTimeout(() => {
+            setDragCat(catName);
+            setDragOverCat(catName);
+            if (typeof window !== "undefined" && window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(50);
+            }
+        }, 350);
+    };
+
+    const handleCatPointerMove = (e: React.PointerEvent) => {
+        if (dragTimerRef.current && Math.abs(e.clientY - dragStartYRef.current) > 8) {
+            window.clearTimeout(dragTimerRef.current);
+            dragTimerRef.current = null;
+        }
+    };
+
+    const handleCatPointerUp = (e: React.PointerEvent) => {
+        if (dragTimerRef.current) {
+            window.clearTimeout(dragTimerRef.current);
+            dragTimerRef.current = null;
+        }
+        if (dragCat) {
+            if (dragOverCat && dragOverCat !== dragCat && dragOverCat !== UNCATEGORIZED_CATEGORY_ID) {
+                const movable = normalizeCategoryOrder(categories, categoryOrder);
+                const fromIdx = movable.indexOf(dragCat);
+                const toIdx = movable.indexOf(dragOverCat);
+                if (fromIdx >= 0 && toIdx >= 0) {
+                    const nextOrder = [...movable];
+                    const [moved] = nextOrder.splice(fromIdx, 1);
+                    nextOrder.splice(toIdx, 0, moved);
+                    const nextCategories = nextOrder.filter(id => id !== UNCATEGORIZED_CATEGORY_ID);
+                    setCategoryOrder(nextOrder);
+                    setCategories(nextCategories);
+                    saveCategoryOrder(nextOrder);
+                    saveCustomCategories(nextCategories);
+                }
+            }
+            setDragCat(null);
+            setDragOverCat(null);
+        }
     };
 
     const openManagedCategory = (catName: string | null) => {
@@ -786,19 +838,35 @@ export default function MusicApp({ onClose }: Props) {
                                                 </div>
                                                 <span className="music-category-manager-badge">固定</span>
                                             </div>
-                                            {orderedCategoryTabs.map((cat, idx) => (
-                                                <div key={cat} className="music-category-manager-row" draggable onDragStart={e => e.dataTransfer.setData('text/plain', cat)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); const from = e.dataTransfer.getData('text/plain'); const fromIdx = orderedCategoryTabs.indexOf(from); const toIdx = orderedCategoryTabs.indexOf(cat); if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return; const nextOrder = [...orderedCategoryTabs]; const [moved] = nextOrder.splice(fromIdx, 1); nextOrder.splice(toIdx, 0, moved); setCategoryOrder(nextOrder); setCategories(nextOrder.filter(id => id !== UNCATEGORIZED_CATEGORY_ID)); saveCategoryOrder(nextOrder); saveCustomCategories(nextOrder.filter(id => id !== UNCATEGORIZED_CATEGORY_ID)); }}>
+                                            {orderedCategoryTabs.map((cat, idx) => {
+                                                const isDragging = dragCat === cat;
+                                                const isOver = dragOverCat === cat;
+                                                return (
+                                                <div
+                                                    key={cat}
+                                                    className="music-category-manager-row"
+                                                    {...(isDragging ? { "data-dragging": "" } : {})}
+                                                    {...(isOver && dragCat !== cat ? { "data-drag-over": "" } : {})}
+                                                    onPointerDown={e => handleCatPointerDown(e, cat)}
+                                                    onPointerMove={handleCatPointerMove}
+                                                    onPointerUp={handleCatPointerUp}
+                                                    onPointerCancel={handleCatPointerUp}
+                                                    onPointerEnter={() => {
+                                                        if (dragCat && dragCat !== cat && dragTimerRef.current === null) {
+                                                            setDragOverCat(cat);
+                                                        }
+                                                    }}
+                                                >
                                                     <button className="music-category-manager-main" onClick={() => cat === UNCATEGORIZED_CATEGORY_ID ? undefined : openManagedCategory(cat)}>
                                                         <span className="music-category-manager-name">{cat === UNCATEGORIZED_CATEGORY_ID ? "未分组" : cat}</span>
                                                         <span className="music-category-manager-count">{cat === UNCATEGORIZED_CATEGORY_ID ? tracks.filter(t => !t.category).length : tracks.filter(t => t.category === cat).length} 首</span>
                                                     </button>
                                                     <div className="music-category-manager-actions">
-                                                        <button title="上移" disabled={idx === 0} onClick={() => handleMoveCategory(cat, -1)}>↑</button>
-                                                        <button title="下移" disabled={idx === orderedCategoryTabs.length - 1} onClick={() => handleMoveCategory(cat, 1)}>↓</button>
                                                         {cat !== UNCATEGORIZED_CATEGORY_ID && <button title="删除" onClick={() => handleDeleteCategory(cat)}>删</button>}
+                                                        <div className="music-category-manager-drag-handle" title="长按拖动排序">≡</div>
                                                     </div>
                                                 </div>
-                                            ))}
+                                            );})} 
                                         </div>
                                     </div>
                                 </div>
@@ -2020,18 +2088,6 @@ function PlaylistsTab({ player, formatTime, onPlayNetease, onPlayAll, activePlay
 
 // ── Settings Tab ──
 function MusicSettingsTab({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
-    const [config, setConfig] = useState<MusicApiConfig>(() => loadMusicApiConfig());
-    const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
-    const [testing, setTesting] = useState(false);
-
-    // QR login state
-    const [qrImg, setQrImg] = useState<string | null>(null);
-    const [qrKey, setQrKey] = useState<string | null>(null);
-    const [qrStatus, setQrStatus] = useState<string>("");
-    const [qrPolling, setQrPolling] = useState(false);
-    const [loginNickname, setLoginNickname] = useState<string | null>(null);
-    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
     // Custom background state (app pages + player each have their own image)
     const [bg, setBg] = useState<MusicBgConfig>(() => loadMusicBg());
     const [bgMsg, setBgMsg] = useState<string | null>(null);
@@ -2100,92 +2156,6 @@ function MusicSettingsTab({ onBack, onSaved }: { onBack: () => void; onSaved: ()
 
     const setPlayerMode = (mode: MusicPlayerBgMode) => {
         applyBg({ ...bg, playerMode: mode });
-    };
-
-    // Check login status on mount when API is configured
-    useEffect(() => {
-        const base = config.baseUrl.trim();
-        if (!base) return;
-        checkLoginStatus(base).then(s => {
-            if (s.loggedIn && s.nickname) {
-                setLoginNickname(s.nickname);
-            }
-        });
-    }, [config.baseUrl]);
-
-    // Cleanup polling on unmount
-    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
-
-    const handleSave = () => {
-        const nextConfig = { ...config, baseUrl: config.baseUrl.trim(), enabled: true };
-        saveMusicApiConfig(nextConfig);
-        setConfig(nextConfig);
-        onSaved();
-        onBack();
-    };
-
-    const handleTest = async () => {
-        if (!config.baseUrl.trim()) return;
-        setTesting(true);
-        setTestResult(null);
-        const result = await testNeteaseConnection(config.baseUrl.trim());
-        setTestResult(result);
-        setTesting(false);
-    };
-
-    const startQrLogin = async () => {
-        const base = config.baseUrl.trim();
-        if (!base) return;
-        setQrStatus("获取二维码...");
-        setQrImg(null);
-        if (pollRef.current) clearInterval(pollRef.current);
-
-        const key = await getQrKey(base);
-        if (!key) { setQrStatus("获取二维码失败"); return; }
-        setQrKey(key);
-
-        const img = await getQrImage(base, key);
-        if (!img) { setQrStatus("生成二维码失败"); return; }
-        setQrImg(img);
-        setQrStatus("请用网易云音乐 App 扫码");
-        setQrPolling(true);
-
-        pollRef.current = setInterval(async () => {
-            const res = await checkQrStatus(base, key);
-            if (res.code === 803) {
-                // Authorized — save auth cookie for subsequent API calls
-                if (res.cookie) saveNeteaseCookie(res.cookie);
-                const nextConfig = { ...config, baseUrl: base, enabled: true };
-                saveMusicApiConfig(nextConfig);
-                setConfig(nextConfig);
-                if (pollRef.current) clearInterval(pollRef.current);
-                setQrPolling(false);
-                setQrImg(null);
-                setQrStatus("");
-                setLoginNickname(res.nickname || "已登录");
-                onSaved();
-            } else if (res.code === 802) {
-                setQrStatus("已扫码，请在手机上确认");
-            } else if (res.code === 800) {
-                if (pollRef.current) clearInterval(pollRef.current);
-                setQrPolling(false);
-                setQrImg(null);
-                setQrStatus("二维码已过期，请重新获取");
-            }
-            // 801 = waiting, do nothing
-        }, 2000);
-    };
-
-    const handleLogout = () => {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setQrPolling(false);
-        setQrImg(null);
-        setQrKey(null);
-        setQrStatus("");
-        setLoginNickname(null);
-        clearNeteaseCookie();
-        clearMusicCloudSyncData();
-        onSaved();
     };
 
     return (
@@ -2355,13 +2325,18 @@ function formatMusicCount(value: number): string {
 
 // ── CSS Editor ──
 import { MUSIC_CSS_EXAMPLE } from "@/lib/css-examples";
-import CSSSchemeBar from "@/components/ui/css-scheme-picker";
+import { getSchemes, saveScheme, deleteScheme, type CSSScheme } from "@/lib/css-scheme-storage";
 
 function MusicCssEditor({ onClose, onSave }: { onClose: () => void; onSave: (css: string) => void }) {
     const [css, setCss] = useState(() => kvGet("music-custom-css") || "");
+    const [schemes, setSchemes] = useState<CSSScheme[]>([]);
+    const [saveName, setSaveName] = useState("");
 
-    const handleSave = () => {
-        const trimmed = css.trim();
+    useEffect(() => {
+        setSchemes(getSchemes("music"));
+    }, []);
+
+    const handleSaveParams = (trimmed: string) => {
         if (trimmed) kvSet("music-custom-css", trimmed);
         else kvRemove("music-custom-css");
         onSave(trimmed);
@@ -2369,43 +2344,84 @@ function MusicCssEditor({ onClose, onSave }: { onClose: () => void; onSave: (css
         onClose();
     };
 
+    const handleCreateScheme = () => {
+        const name = saveName.trim();
+        if (!name || !css.trim()) return;
+        const s = saveScheme("music", name, css.trim());
+        setSchemes(prev => [...prev, s]);
+        setSaveName("");
+    };
+
+    const handleApplyScheme = (schemeCss: string) => {
+        setCss(schemeCss);
+        handleSaveParams(schemeCss);
+    };
+
+    const handleDeleteScheme = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        deleteScheme(id);
+        setSchemes(prev => prev.filter(x => x.id !== id));
+    };
+
     return (
         <div className="music-settings">
             <div className="music-settings-header">
-                <h2>自定义样式</h2>
+                <h2>自定义主题方案</h2>
                 <button className="music-settings-close" onClick={onClose}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
             </div>
-            <div className="music-settings-body">
-                <div className="music-settings-hint">输入 CSS 代码，覆盖音乐页面任意样式</div>
-                <textarea
-                    className="music-settings-input"
-                    style={{ height: 280, resize: "none", fontFamily: "'SF Mono', 'Menlo', 'Monaco', monospace", fontSize: "calc(13px*var(--app-text-scale,1))", lineHeight: 1.6, padding: "12px 14px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}
-                    value={css}
-                    onChange={e => setCss(e.target.value)}
-                    placeholder="/* 在此输入自定义 CSS... */"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                />
-                <div className="music-settings-actions">
-                    <CSSSchemeBar target="music" currentCSS={css} onLoad={setCss} btnStyle={{
-                      border: "1px solid var(--c-music-surface-solid, rgba(255,255,255,0.12))",
-                      background: "var(--c-music-surface, rgba(255,255,255,0.06))",
-                      color: "var(--c-music-text, #e0d8f0)",
-                    }} modalVars={{
-                      panel: "var(--c-music-bg, #0c0a1a)",
-                      border: "var(--c-music-surface-solid, rgba(255,255,255,0.12))",
-                      text: "var(--c-music-text, #e0d8f0)",
-                      textDim: "var(--c-music-accent, #b49de8)",
-                      input: "var(--c-music-surface, rgba(255,255,255,0.06))",
-                      inputBorder: "var(--c-music-surface-solid, rgba(255,255,255,0.12))",
-                      accent: "var(--c-music-accent, #b49de8)",
-                    }} />
-                    <button className="music-settings-btn" onClick={() => setCss(MUSIC_CSS_EXAMPLE)}>示例</button>
-                    <button className="music-settings-btn" onClick={() => setCss("")}>清空</button>
-                    <button className="music-settings-btn music-settings-btn-primary" onClick={handleSave}>保存</button>
+            <div className="music-settings-body" style={{ padding: '0 16px 16px' }}>
+                <div className="music-settings-section" style={{ gap: 8 }}>
+                    <textarea
+                        className="music-settings-input"
+                        style={{ height: 180, resize: "none", fontFamily: "'SF Mono', 'Menlo', 'Monaco', monospace", fontSize: "calc(11px*var(--app-text-scale,1))", lineHeight: 1.5, padding: "10px 12px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+                        value={css}
+                        onChange={e => setCss(e.target.value)}
+                        placeholder="/* 在此输入自定义 CSS... */"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                    />
+                    <div className="music-settings-actions">
+                        <input
+                            className="music-settings-input"
+                            value={saveName}
+                            onChange={e => setSaveName(e.target.value)}
+                            placeholder="输入方案名称"
+                            onKeyDown={e => e.key === "Enter" && handleCreateScheme()}
+                        />
+                        <button className="music-settings-btn music-settings-btn-primary" style={{ flex: '0 0 76px' }} disabled={!saveName.trim() || !css.trim()} onClick={handleCreateScheme}>保存方案</button>
+                        <button className="music-settings-btn" style={{ flex: '0 0 76px' }} disabled={!css.trim()} onClick={() => handleSaveParams(css)}>应用</button>
+                    </div>
+                </div>
+
+                <div className="music-settings-section music-qr-section">
+                    <div className="music-settings-label">我的方案</div>
+                    <div className="music-category-manager-list">
+                        <div className="music-category-manager-row" onClick={() => handleApplyScheme("")}>
+                            <div className="music-category-manager-main">
+                                <span className="music-category-manager-name">默认（清空样式）</span>
+                            </div>
+                            <span className="music-category-manager-badge">系统</span>
+                        </div>
+                        <div className="music-category-manager-row" onClick={() => handleApplyScheme(MUSIC_CSS_EXAMPLE)}>
+                            <div className="music-category-manager-main">
+                                <span className="music-category-manager-name">暗色渐变示例</span>
+                            </div>
+                            <span className="music-category-manager-badge">示例</span>
+                        </div>
+                        {schemes.map(s => (
+                            <div key={s.id} className="music-category-manager-row" onClick={() => handleApplyScheme(s.css)}>
+                                <div className="music-category-manager-main">
+                                    <span className="music-category-manager-name">{s.name}</span>
+                                </div>
+                                <div className="music-category-manager-actions">
+                                    <button title="删除" onClick={(e) => handleDeleteScheme(s.id, e)}>删</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

@@ -2150,6 +2150,32 @@
     cursor: default;
 }
 
+.music-category-manager-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 28px;
+    color: var(--c-music-accent);
+    opacity: 0.5;
+    font-size: 18px;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.music-category-manager-row[data-dragging] {
+    opacity: 0.7;
+    transform: scale(0.98);
+    box-shadow: 0 8px 24px var(--c-music-accent-dim);
+    z-index: 10;
+}
+
+.music-category-manager-row[data-drag-over] {
+    border-color: var(--c-music-accent);
+    background: var(--c-music-accent-dim);
+}
+
 .music-category-manager-actions button:last-child {
     color: #ff4757;
 }
