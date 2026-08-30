@@ -18,6 +18,7 @@ import type { Character } from "@/lib/character-types";
 type QuickScope = "global" | "character";
 type FloatingPosition = { left: number; top: number };
 type PopoverPosition = { left: number; top: number };
+type DockSide = "left" | "right" | null;
 type FloatingDragState = {
     pointerId: number;
     startClientX: number;
@@ -30,6 +31,9 @@ type FloatingDragState = {
 };
 
 const EMPTY_BINDING_CONFIG: BindingConfig = { globalDefaults: {}, characterBindings: [] };
+
+const DOCK_THRESHOLD = 0.5; // 50% 边界判定
+const DOCK_BUTTON_WIDTH = 40; // 贴边后可见宽度（px）
 
 function clampFloatingPosition(value: number, max: number): number {
     return Math.min(Math.max(12, value), max);
@@ -58,6 +62,7 @@ export function QuickActionFloat() {
     const [floatingPosition, setFloatingPosition] = useState<FloatingPosition | null>(null);
     const [popoverPosition, setPopoverPosition] = useState<PopoverPosition | null>(null);
     const [draggingFloatingButton, setDraggingFloatingButton] = useState(false);
+    const [dockSide, setDockSide] = useState<DockSide>(null);
     const layerRef = useRef<HTMLDivElement | null>(null);
     const floatingButtonRef = useRef<HTMLButtonElement | null>(null);
     const floatingDragRef = useRef<FloatingDragState | null>(null);
@@ -244,7 +249,16 @@ export function QuickActionFloat() {
         const drag = floatingDragRef.current;
         if (!drag || drag.pointerId !== event.pointerId) return;
         event.stopPropagation();
-        if (drag.moved) suppressFloatingClickRef.current = true;
+        if (drag.moved) {
+            suppressFloatingClickRef.current = true;
+            // 计算离哪边近，自动吸附
+            const currentLeft = floatingPosition?.left ?? drag.left;
+            const midX = drag.maxLeft * DOCK_THRESHOLD;
+            const snap: DockSide = currentLeft < midX ? "left" : "right";
+            const snapLeft = snap === "left" ? - (64 - DOCK_BUTTON_WIDTH) : drag.maxLeft + (64 - DOCK_BUTTON_WIDTH);
+            setFloatingPosition({ left: snapLeft, top: floatingPosition?.top ?? drag.top });
+            setDockSide(snap);
+        }
         floatingDragRef.current = null;
         setDraggingFloatingButton(false);
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -258,6 +272,16 @@ export function QuickActionFloat() {
             suppressFloatingClickRef.current = false;
             return;
         }
+        // 贴边态 → 第1次点击：展开为完整悬浮球
+        if (dockSide !== null) {
+            setDockSide(null);
+            if (floatingPosition) {
+                const adjust = dockSide === "left" ? 0 : floatingPosition.left - (64 - DOCK_BUTTON_WIDTH);
+                setFloatingPosition({ left: Math.max(12, adjust), top: floatingPosition.top });
+            }
+            return;
+        }
+        // 完整悬浮球 → 第2次点击：打开面板
         reloadData();
         setOpen(prev => !prev);
     }
@@ -288,6 +312,7 @@ export function QuickActionFloat() {
                 aria-label="打开快捷操作"
                 data-positioned={floatingPosition ? "" : undefined}
                 data-dragging={draggingFloatingButton ? "" : undefined}
+                data-docked={dockSide ?? undefined}
                 onPointerDown={handleFloatingPointerDown}
                 onPointerMove={handleFloatingPointerMove}
                 onPointerUp={handleFloatingPointerEnd}
