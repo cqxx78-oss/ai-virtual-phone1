@@ -21,18 +21,26 @@ import { Alert } from "@/components/ui/feedback";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { Input, Select, Textarea, Toggle } from "@/components/ui/form";
 
-const SIZE_PRESET_ITEMS = [
+const DEFAULT_SIZE_PRESETS = [
     { value: "auto", label: "auto" },
     { value: "1024x1024", label: "1024×1024 (2K)" },
+    { value: "1024x1536", label: "1024×1536 (2K)" },
+    { value: "1080x1920", label: "1080×1920 (2K)" },
+    { value: "2048x2048", label: "2048×2048 (4K)" },
+    { value: "1712x2560", label: "1712×2560 (4K)" },
+    { value: "2160x3840", label: "2160×3840 (4K)" },
+] as const;
+
+const LANDSCAPE_SIZE_PRESETS = [
     { value: "1536x1024", label: "1536×1024 (2K)" },
     { value: "1920x1080", label: "1920×1080 (2K)" },
-    { value: "2048x2048", label: "2048×2048 (4K)" },
     { value: "2560x1712", label: "2560×1712 (4K)" },
     { value: "3840x2160", label: "3840×2160 (4K)" },
 ] as const;
 
-const SIZE_PRESETS = SIZE_PRESET_ITEMS.map(i => i.value);
-const SIZE_OPTIONS = [...SIZE_PRESETS, "custom"];
+const ALL_SIZE_PRESET_ITEMS = [...DEFAULT_SIZE_PRESETS, ...LANDSCAPE_SIZE_PRESETS];
+const SIZE_PRESETS = ALL_SIZE_PRESET_ITEMS.map(i => i.value);
+const SIZE_LABEL_MAP: Record<string, string> = Object.fromEntries(ALL_SIZE_PRESET_ITEMS.map(i => [i.value, i.label]));
 const QUALITY_OPTIONS = ["auto", "low", "medium", "high"];
 
 /** 判断是否为自定义尺寸 */
@@ -115,6 +123,7 @@ export function ImageGenerationSettings() {
     const [customW, setCustomW] = useState("2048");
     const [customH, setCustomH] = useState("2048");
     const lastCustomSize = useRef("2048x2048");
+    const [sizeTab, setSizeTab] = useState<"default" | "landscape">("default");
 
     useEffect(() => {
         const loaded = loadImageGenerationSettings();
@@ -629,12 +638,47 @@ export function ImageGenerationSettings() {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="flex flex-col gap-1">
-                                    <label className="menu-desc ml-1">尺寸</label>
+                                    <div className="flex items-center justify-between ml-1">
+                                        <label className="menu-desc">尺寸</label>
+                                        <div className="flex gap-1 bg-[var(--c-input)] p-0.5 rounded-lg">
+                                            <button
+                                                type="button"
+                                                onClick={() => setSizeTab("default")}
+                                                className={`px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-all ${
+                                                    sizeTab === "default"
+                                                        ? "bg-black text-white shadow-xs"
+                                                        : "text-[var(--c-text-sub)] hover:text-black"
+                                                }`}
+                                            >
+                                                默认
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSizeTab("landscape")}
+                                                className={`px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-all ${
+                                                    sizeTab === "landscape"
+                                                        ? "bg-black text-white shadow-xs"
+                                                        : "text-[var(--c-text-sub)] hover:text-black"
+                                                }`}
+                                            >
+                                                横屏
+                                            </button>
+                                        </div>
+                                    </div>
                                     <Select
                                         value={isCustomSize(editingProfile.size) ? "custom" : editingProfile.size}
                                         onChange={(event) => selectSize(editingProfile, event.target.value)}
                                     >
-                                        {SIZE_PRESET_ITEMS.map(item => (
+                                        {/* 当前选中的值如果不属于当前 tab，先作为一项展示以防显示空白 */}
+                                        {!isCustomSize(editingProfile.size) &&
+                                            editingProfile.size !== "custom" &&
+                                            !(sizeTab === "default" ? DEFAULT_SIZE_PRESETS : LANDSCAPE_SIZE_PRESETS).some(i => i.value === editingProfile.size) && (
+                                                <option value={editingProfile.size}>
+                                                    {SIZE_LABEL_MAP[editingProfile.size] || editingProfile.size}
+                                                </option>
+                                            )
+                                        }
+                                        {(sizeTab === "default" ? DEFAULT_SIZE_PRESETS : LANDSCAPE_SIZE_PRESETS).map(item => (
                                             <option key={item.value} value={item.value}>{item.label}</option>
                                         ))}
                                         <option value="custom">自定义…</option>
