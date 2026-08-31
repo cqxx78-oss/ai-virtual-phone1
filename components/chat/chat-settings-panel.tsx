@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import {
     CHAT_INITIAL_VISIBLE_MESSAGE_COUNT,
     CHAT_LOAD_MORE_MESSAGE_COUNT,
@@ -413,6 +414,37 @@ export function ChatSettingsPanel({
     const [showSearch, setShowSearch] = useState(false);
     // TA 的电脑：翻看角色云端电脑（连接了角色电脑才显示入口）
     const [showComputer, setShowComputer] = useState(false);
+    // 聊天信息子页面（搜索聊天记录、角色电脑、CSS 编辑器、状态栏定制、特效设置等）纳入导航栈
+    useEffect(() => {
+        if (showSearch) {
+            return pushNav(() => closeSearchPanel(), "chatSettings:search");
+        }
+    }, [showSearch]);
+
+    useEffect(() => {
+        if (showComputer) {
+            return pushNav(() => setShowComputer(false), "chatSettings:computer");
+        }
+    }, [showComputer]);
+
+    useEffect(() => {
+        if (editingCSS) {
+            return pushNav(() => setEditingCSS(false), "chatSettings:css");
+        }
+    }, [editingCSS]);
+
+    useEffect(() => {
+        if (showStatusRegionDialog) {
+            return pushNav(() => setShowStatusRegionDialog(false), "chatSettings:statusRegion");
+        }
+    }, [showStatusRegionDialog]);
+
+    useEffect(() => {
+        if (showScreenEffects) {
+            return pushNav(() => setShowScreenEffects(false), "chatSettings:screenEffects");
+        }
+    }, [showScreenEffects]);
+
     const [searchQuery, setSearchQuery] = useState("");
     const [submittedSearchQuery, setSubmittedSearchQuery] = useState("");
     const [searchHistoryMessages, setSearchHistoryMessages] = useState<ChatMessage[]>([]);

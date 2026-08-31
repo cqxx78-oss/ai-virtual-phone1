@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { ChatSession, ChatMessage, CHAT_APP_SETTINGS_UPDATED_EVENT, CHAT_INITIAL_VISIBLE_MESSAGE_COUNT, CHAT_LOAD_MORE_MESSAGE_COUNT, CHAT_REQUEST_REPLY_EVENT, loadChatAppSettings, loadChatMessages, loadChatContacts, loadChatSessions, saveChatSessions, pushChatMessage, updateChatMessage, deleteChatMessage, deleteChatMessagesFrom, deleteChatMessagesByIds, retractChatMessage, editChatMessage, updateMessageMediaData, replaceResponseBatchWithParts, replaceGroupResponseRound, isReadingDiscussMessage, isSystemInstructionMessage, createResponseBatchId, createResponseRoundId, getLatestStateValues, getLatestCharacterStateValues, compareChatMessages } from "@/lib/chat-storage";
 import type { StateValue } from "@/lib/chat-storage";
 import { parseStateValues, mergeStateValues } from "@/lib/state-value-parser";
@@ -1122,6 +1123,40 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     useEffect(() => {
         setTheaterMode(kvGet(CHAT_THEATER_MODE_PREFIX + session.id) === "1");
     }, [session.id]);
+
+    // 聊天设置/信息面板 (右上角三个点) 纳入导航栈：按返回键退回聊天室而非消息列表
+    useEffect(() => {
+        if (showSettings) {
+            return pushNav(() => {
+                setShowSettings(false);
+            }, `chat:settings:${session.id}`);
+        }
+    }, [showSettings, session.id]);
+
+    // 各种弹层（输入面板、通话、详情）纳入导航栈管理
+    useEffect(() => {
+        if (richModal) {
+            return pushNav(() => setRichModal(null), "chat:richModal");
+        }
+    }, [richModal]);
+
+    useEffect(() => {
+        if (mediaDetailMsg) {
+            return pushNav(() => setMediaDetailMsg(null), "chat:mediaDetail");
+        }
+    }, [mediaDetailMsg]);
+
+    useEffect(() => {
+        if (showVoiceCall) {
+            return pushNav(() => setShowVoiceCall(false), "chat:voiceCall");
+        }
+    }, [showVoiceCall]);
+
+    useEffect(() => {
+        if (showVideoCall) {
+            return pushNav(() => setShowVideoCall(false), "chat:videoCall");
+        }
+    }, [showVideoCall]);
 
     // 聊天插件：进入聊天广播 session.opened
     useEffect(() => {
