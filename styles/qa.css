@@ -212,7 +212,7 @@
 .qa-scroll-bottom-btn {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 154px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 126px);
   transform: translateX(-50%);
   z-index: 12;
   width: 48px;
