@@ -1102,21 +1102,29 @@ function DiaryEntryFontPanel({
             ) : (
               characters.map(character => (
                 <div key={character.id} className="diary-font-character-item">
-                  <div className="diary-font-character-info">
-                    <div className="diary-font-character-avatar">
-                      {character.avatar ? <img src={character.avatar} alt="" /> : <Bot size={16} />}
+                  <div className="diary-font-character-row">
+                    <div className="diary-font-character-info">
+                      <div className="diary-font-character-avatar">
+                        {character.avatar ? <img src={character.avatar} alt="" /> : <Bot size={16} />}
+                      </div>
+                      <span className="diary-font-character-name">{character.name}</span>
                     </div>
-                    <span className="diary-font-character-name">{character.name}</span>
+                    <select
+                      className="diary-font-select"
+                      value={characterFontMap[character.id] || "ximai"}
+                      onChange={e => onCharacterFontChange(character.id, e.target.value)}
+                    >
+                      {allFontOptions.map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.name}</option>
+                      ))}
+                    </select>
                   </div>
-                  <select
-                    className="diary-font-select"
-                    value={characterFontMap[character.id] || "ximai"}
-                    onChange={e => onCharacterFontChange(character.id, e.target.value)}
+                  <div
+                    className="diary-font-sample-preview"
+                    style={{ fontFamily: fontFamilyById.get(characterFontMap[character.id] || "ximai") || 'var(--app-font-family)' }}
                   >
-                    {allFontOptions.map(opt => (
-                      <option key={opt.id} value={opt.id}>{opt.name}</option>
-                    ))}
-                  </select>
+                    见字如面 · 今日晴朗，记录下留存的瞬间。
+                  </div>
                 </div>
               ))
             )}
@@ -1131,19 +1139,27 @@ function DiaryEntryFontPanel({
             {customFonts.length > 0 && (
               <div style={{ marginTop: "12px" }}>
                 <div style={{ fontSize: "12px", fontWeight: 600, color: "rgba(48,45,40,0.7)", marginBottom: "6px" }}>已上传字体：</div>
-                {customFonts.map(font => (
-                  <div key={font.id} className="diary-font-custom-item">
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{font.name}</span>
-                    <button
-                      type="button"
-                      className="diary-font-delete-btn"
-                      title="删除字体"
-                      onClick={() => onDeleteCustomFont(font.id)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                ))}
+                {customFonts.map(font => {
+                  const family = `"AIPhoneDiaryFont_${font.id}", "NoteWall Ximai", var(--app-font-family)`;
+                  return (
+                    <div key={font.id} className="diary-font-custom-item">
+                      <div className="diary-font-custom-meta">
+                        <strong className="diary-font-custom-title">{font.name}</strong>
+                        <span className="diary-font-custom-sample" style={{ fontFamily: family }}>
+                          见字如面 Aa 123
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="diary-font-delete-btn"
+                        title="删除字体"
+                        onClick={() => onDeleteCustomFont(font.id)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
