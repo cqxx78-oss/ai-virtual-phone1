@@ -80,7 +80,7 @@ export function EmojiPanel({ onSelect, onEffectSend }: EmojiPanelProps) {
     const showEffectTab = enabledEffects.length > 0;
 
     return (
-        <div className="h-[280px] flex flex-col pt-1">
+        <div className="h-[330px] flex flex-col pt-1">
             <div className="flex gap-0.5 px-2 py-1 overflow-x-auto shrink-0 hide-scrollbar">
                 {showEffectTab && (
                     <button
@@ -113,12 +113,12 @@ export function EmojiPanel({ onSelect, onEffectSend }: EmojiPanelProps) {
                     ))}
                 </div>
             ) : (
-                <div className="flex-1 overflow-auto px-2 py-1 grid grid-cols-8 gap-0.5 content-start hide-scrollbar">
+                <div className="flex-1 overflow-auto px-1 py-1 grid grid-cols-8 gap-x-0.5 gap-y-1 content-start hide-scrollbar">
                     {EMOJI_CATEGORIES[emojiCategory].emojis.map((emoji, i) => (
                         <button
                             key={i}
                             onClick={() => onSelect(emoji)}
-                            className="border-none bg-transparent ts-18 cursor-pointer p-0.5 rounded-lg flex items-center justify-center aspect-square"
+                            className="border-none bg-transparent ts-22 cursor-pointer p-1 rounded-lg flex items-center justify-center aspect-square transition-transform active:scale-125"
                         >{emoji}</button>
                     ))}
                 </div>
@@ -168,7 +168,7 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
     const activePack = stickerPacks.find(pack => pack.id === activePackId) ?? stickerPacks[0] ?? null;
 
     return (
-        <div className="h-[280px] flex flex-col pt-1">
+        <div className="h-[330px] flex flex-col pt-1">
             {stickerPacks.length > 0 && (
                 <div className="flex gap-0.5 px-2 py-1 overflow-x-auto shrink-0 hide-scrollbar">
                     {stickerPacks.map(pack => (
@@ -191,6 +191,7 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                 )}
                 {activePack?.stickers.map(sticker => {
                     const url = packUrlMap[`${activePack.id}:${sticker.name}`];
+                    const showName = sticker.name && !sticker.name.startsWith("sticker_") && !/^\d+$/.test(sticker.name);
                     return (
                         <button
                             key={`${activePack.id}:${sticker.id}`}
@@ -205,8 +206,8 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                                     <span className="ts-11 text-[var(--c-text)] max-w-full truncate">{sticker.name}</span>
                                 )}
                             </div>
-                            <span className="ts-10 leading-tight text-[var(--c-text)] opacity-75 w-full text-center truncate">
-                                {sticker.name}
+                            <span className="ts-10 leading-tight text-[var(--c-text)] opacity-75 w-full text-center truncate min-h-[14px]">
+                                {showName ? sticker.name : ""}
                             </span>
                         </button>
                     );
