@@ -187,29 +187,10 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                 title="Contacts"
                 onBack={onCloseApp}
                 bodyRef={bodyRef}
-                rightAction={
-                    <button
-                        className="page-back-btn"
-                        type="button"
-                        onClick={() => {
-                            addFromCardRef.current = false;
-                            setIsAddFriendOpen(true);
-                            setAddQuery("");
-                            setAddResult(undefined);
-                            setIsSendingAdd(false);
-                            setGreetingText(identity?.name ? `我是${identity.name}` : "你好");
-                        }}
-                    >
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v8M8 12h8" /></svg>
-                    </button>
-                }
             >
             <div className="px-5">
                 {/* Search bar */}
-                <div className="pt-5 pb-1">
-                    <div className="flex items-center justify-between mb-4 mt-2">
-                        <span className="ts-28 font-bold text-[var(--c-text-title)]">Contacts</span>
-                    </div>
+                <div className="pt-5 pb-3">
                     <div className="chat-search-bar">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c-icon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input
@@ -218,29 +199,6 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                             value={contactFilter}
                             onChange={(e) => setContactFilter(e.target.value)}
                         />
-                    </div>
-                </div>
-
-                {/* New Friends entry */}
-                <div className="mb-3 mt-3">
-                    <div
-                        className="minimal-list-item"
-                        onClick={() => pendingRequests.length > 0 && setShowRequestList(true)}
-                    >
-                        <div className="w-[48px] h-[48px] rounded-full bg-[var(--c-action-blue,#246bfd)] flex items-center justify-center shrink-0">
-                            <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                                <circle cx="9" cy="7" r="4" />
-                                <line x1="19" y1="8" x2="19" y2="14" />
-                                <line x1="22" y1="11" x2="16" y2="11" />
-                            </svg>
-                        </div>
-                        <div className="flex-1 overflow-hidden h-[48px] flex flex-col justify-center">
-                            <div className="ts-16 font-medium text-[var(--c-text-title)]">New Friends</div>
-                        </div>
-                        {pendingRequests.length > 0 && (
-                            <div className="minimal-unread-count ml-auto shrink-0">{pendingRequests.length}</div>
-                        )}
                     </div>
                 </div>
 
@@ -302,144 +260,154 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                         ))}
                     </div>
                 )}
-
-                {/* Right-side alphabet index */}
-                {indexLetters.length > 0 && (
-                    <div className="contact-alpha-index">
-                        {indexLetters.map(letter => (
-                            <div
-                                key={letter}
-                                className="contact-alpha-letter"
-                                onClick={() => {
-                                    scrollElementWithinContainer(bodyRef.current, sectionRefs.current[letter], { behavior: "smooth", block: "start" });
-                                }}
-                            >
-                                {letter}
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
+
+            {/* Quick-jump letter index on the right */}
+            {indexLetters.length > 1 && (
+                <div className="contact-alpha-index">
+                    {indexLetters.map(letter => (
+                        <span
+                            key={letter}
+                            className="contact-alpha-letter"
+                            onClick={() => {
+                                const target = sectionRefs.current[letter];
+                                const container = bodyRef.current;
+                                if (target && container) {
+                                    scrollElementWithinContainer(container, target, { behavior: "smooth", block: "start" });
+                                }
+                            }}
+                        >
+                            {letter}
+                        </span>
+                    ))}
+                </div>
+            )}
+            </PageShell>
 
             {/* Friend Request List Modal */}
             {showRequestList && (
                 <div className="modal-overlay" onClick={() => setShowRequestList(false)}>
                     <div className="modal-dialog freq-dialog" onClick={e => e.stopPropagation()}>
-                        <div className="ts-17 font-semibold text-center text-[var(--c-text-title)]">
-                            新的朋友
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--c-card-border)]">
+                            <span className="ts-16 font-bold text-[var(--c-text-title)]">新的朋友</span>
+                            <button onClick={() => setShowRequestList(false)} className="ui-bare-btn text-[var(--c-icon)] ts-14">关闭</button>
                         </div>
-                        {pendingRequests.length === 0 ? (
-                            <div className="py-6 text-center text-[var(--c-text)] ts-14">
-                                暂无好友申请
-                            </div>
-                        ) : (
-                            <div className="freq-list">
-                                {pendingRequests.map(req => {
-                                    const char = getCharForRequest(req);
-                                    return (
-                                        <div
-                                            key={req.id}
-                                            className="freq-list-item"
-                                            onClick={() => setSelectedRequest(req)}
-                                        >
-                                            <div className="freq-avatar">
-                                                {char?.avatar ? (
-                                                    <img src={char.avatar} alt="" />
-                                                ) : (
-                                                    <div className="freq-avatar-fallback">
-                                                        {(char?.name || "?")[0]}
-                                                    </div>
-                                                )}
+
+                        <div className="freq-list">
+                            {pendingRequests.map(req => {
+                                const char = getCharForRequest(req);
+                                return (
+                                    <div
+                                        key={req.id}
+                                        className="freq-list-item"
+                                        onClick={() => setSelectedRequest(req)}
+                                    >
+                                        <div className="freq-avatar">
+                                            {char?.avatar ? (
+                                                <img src={char.avatar} alt="" />
+                                            ) : (
+                                                <div className="freq-avatar-fallback">
+                                                    {char?.name?.charAt(0) || "?"}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <div className="ts-14 font-medium text-[var(--c-text-title)] truncate">
+                                                {char?.name || "未知角色"}
                                             </div>
-                                            <div className="flex-1 overflow-hidden">
-                                                <div className="menu-label font-medium truncate">
-                                                    {char?.name || "未知角色"}
-                                                </div>
-                                                <div className="ts-12 text-[var(--c-text)] truncate mt-[2px]">
-                                                    {req.message}
-                                                </div>
+                                            <div className="ts-12 text-[var(--c-icon)] truncate mt-0.5">
+                                                {req.message || "请求添加你为好友"}
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                        <button
-                            onClick={() => setShowRequestList(false)}
-                            className="ui-btn ui-btn-ghost w-full"
-                        >
-                            关闭
-                        </button>
+                                        <span className="ts-12 text-[var(--c-action-blue,#246bfd)] font-medium shrink-0">查看</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* Friend Request Detail Modal */}
-            {selectedRequest && (() => {
-                const char = getCharForRequest(selectedRequest);
-                return (
-                    <div className="modal-overlay" onClick={() => !isProcessing && setSelectedRequest(null)}>
-                        <div className="modal-dialog freq-dialog" onClick={e => e.stopPropagation()}>
-                            {/* Avatar */}
-                            <div className="freq-detail-avatar">
-                                {char?.avatar ? (
-                                    <img src={char.avatar} alt="" />
-                                ) : (
-                                    <div className="freq-avatar-fallback" style={{ fontSize: "calc(28px*var(--app-text-scale,1))" }}>
-                                        {(char?.name || "?")[0]}
+            {selectedRequest && (
+                <div className="modal-overlay" onClick={() => !isProcessing && setSelectedRequest(null)}>
+                    <div className="modal-dialog freq-dialog" onClick={e => e.stopPropagation()}>
+                        {(() => {
+                            const char = getCharForRequest(selectedRequest);
+                            return (
+                                <div className="flex flex-col items-center gap-4 py-2">
+                                    <div className="freq-detail-avatar">
+                                        {char?.avatar ? (
+                                            <img src={char.avatar} alt="" />
+                                        ) : (
+                                            <div className="freq-avatar-fallback text-xl">
+                                                {char?.name?.charAt(0) || "?"}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Name */}
-                            <div className="ts-17 font-semibold text-center text-[var(--c-text)]">
-                                {char?.name || "未知角色"}
-                            </div>
+                                    <div className="text-center">
+                                        <div className="ts-16 font-bold text-[var(--c-text-title)]">{char?.name || "未知角色"}</div>
+                                        {char?.persona && (
+                                            <div className="ts-12 text-[var(--c-icon)] mt-1 max-w-[240px] truncate">{char.persona}</div>
+                                        )}
+                                    </div>
 
-                            {/* Message */}
-                            <div className="freq-detail-msg">
-                                {selectedRequest.message}
-                            </div>
+                                    <div className="freq-detail-msg">
+                                        &ldquo;{selectedRequest.message || "请求添加你为好友"}&rdquo;
+                                    </div>
 
-                            {/* Actions */}
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={() => handleReject(selectedRequest)}
-                                    disabled={isProcessing}
-                                    className="ui-btn ui-btn-ghost flex-1"
-                                >
-                                    拒绝
-                                </button>
-                                <button
-                                    onClick={() => handleAccept(selectedRequest)}
-                                    disabled={isProcessing}
-                                    className="ui-btn ui-btn-success flex-1"
-                                >
-                                    {isProcessing ? "处理中..." : "接受"}
-                                </button>
-                            </div>
-                        </div>
+                                    <div className="flex gap-3 w-full mt-2">
+                                        <button
+                                            onClick={() => handleReject(selectedRequest)}
+                                            disabled={isProcessing}
+                                            className="ui-btn ui-btn-outline flex-1"
+                                        >
+                                            拒绝
+                                        </button>
+                                        <button
+                                            onClick={() => handleAccept(selectedRequest)}
+                                            disabled={isProcessing}
+                                            className="ui-btn ui-btn-primary flex-1"
+                                        >
+                                            {isProcessing ? "处理中..." : "同意"}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
-                );
-            })()}
+                </div>
+            )}
 
-            </PageShell>
-
-            {/* Add Friend Modal */}
+            {/* Add Friend Search Modal */}
             {isAddFriendOpen && (
                 <div style={{ position: 'absolute', inset: 0, zIndex: 9999, background: '#ffffff' }}>
                 <div style={{ position: 'absolute', inset: 0, background: 'var(--c-page-body-bg)' }}>
-                <PageShell title="添加朋友" onBack={() => { setIsAddFriendOpen(false); if (addFromCardRef.current) { addFromCardRef.current = false; onPendingAddContactBack?.(); } }}>
+                <PageShell
+                    title="添加朋友"
+                    onBack={() => {
+                        setIsAddFriendOpen(false);
+                        if (addFromCardRef.current) {
+                            addFromCardRef.current = false;
+                            onPendingAddContactBack?.();
+                        }
+                    }}
+                >
+
                     {!addResult && addResult !== null && (
                         <div className="page-menu">
                             <div className="menu-group">
                                 <div className="menu-item">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-icon)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-icon)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                     <input
                                         autoFocus
                                         placeholder="微信号/手机号"
                                         value={addQuery}
-                                        onChange={(e) => { setAddQuery(e.target.value); setAddResult(undefined); }}
+                                        onChange={(e) => {
+                                            setAddQuery(e.target.value);
+                                            setAddResult(undefined);
+                                        }}
                                         className="ui-input ui-input-inline"
                                     />
                                     {addQuery && (
@@ -448,55 +416,38 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                                         </button>
                                     )}
                                 </div>
+
                                 {addQuery.trim().length > 0 && (
-                                    <button
-                                        className="menu-item"
+                                    <div
                                         onClick={() => {
-                                            const found = chars.find(c => c.wechatID === addQuery.trim() || c.id === addQuery.trim());
+                                            const q = addQuery.trim().toLowerCase();
+                                            const chars = loadCharacters();
+                                            const found = chars.find(c =>
+                                                (c.wechatID && c.wechatID.toLowerCase() === q) ||
+                                                (c.id && c.id.toLowerCase() === q)
+                                            );
                                             setAddResult(found || null);
                                         }}
+                                        className="menu-item cursor-pointer border-t border-[var(--c-card-border)] !py-3"
                                     >
-                                        <div className="menu-icon">
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c-success)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                        <div className="w-[36px] h-[36px] rounded-[6px] bg-[var(--c-action-blue,#246bfd)] flex items-center justify-center text-white shrink-0">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                         </div>
                                         <div className="menu-label-group">
-                                            <span className="menu-label">搜索：<span className="text-[var(--c-success)]">{addQuery}</span></span>
+                                            <div className="menu-label text-[var(--c-action-blue,#246bfd)]">搜索: <span className="font-semibold text-[var(--c-text-title)]">{addQuery.trim()}</span></div>
                                         </div>
-                                    </button>
+                                    </div>
                                 )}
                             </div>
-                            {!mascotSettings.chatEnabled && (
-                                <div className="menu-group" style={{ marginTop: 12 }}>
-                                    <div className="menu-item" style={{ pointerEvents: "none" }}>
-                                        <span className="menu-desc">可添加的内置助手</span>
-                                    </div>
-                                    <button
-                                        className="menu-item"
-                                        onClick={() => {
-                                            updateMascotSettings({ chatEnabled: true });
-                                            addFromCardRef.current = false;
-                                            setIsAddFriendOpen(false);
-                                            setAddQuery("");
-                                            setAddResult(undefined);
-                                            setIsSendingAdd(false);
-                                            onSelectMascot();
-                                        }}
-                                    >
-                                        <div className="add-friend-avatar" style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: "#fff" }}>
-                                            <img src={mascotAvatarUrl} className="w-full h-full object-contain p-[2px]" alt="" />
-                                        </div>
-                                        <div className="menu-label-group" style={{ minWidth: 0 }}>
-                                            <span className="menu-label">AI助手</span>
-                                            <span className="menu-desc">重新添加后不会自动打招呼</span>
-                                        </div>
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     )}
+
                     {addResult === null && (
-                        <div className="ui-empty"><span className="menu-desc">该用户不存在</span></div>
+                        <div className="ui-empty">
+                            <span className="menu-desc">该用户不存在</span>
+                        </div>
                     )}
+
                     {addResult && !isSendingAdd && (
                         <div className="page-menu">
                             <div className="menu-group">
@@ -515,9 +466,15 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={() => setIsSendingAdd(true)} className="ui-btn ui-btn-success w-full">添加到通讯录</button>
+                            <button
+                                onClick={() => setIsSendingAdd(true)}
+                                className="ui-btn ui-btn-success w-full"
+                            >
+                                添加到通讯录
+                            </button>
                         </div>
                     )}
+
                     {isSendingAdd && addResult && (
                         <div className="page-menu">
                             <p className="menu-group-desc mx-0">发送添加朋友申请</p>
@@ -538,31 +495,68 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={() => {
+                                        // 1. Add to contacts
                                         addChatContact(addResult.id);
                                         clearRequestsForCharacter(addResult.id);
                                         dispatchFriendRequestUpdated();
+                                        // 2. Create or get session
                                         const newSession = createOrGetSession(addResult.id);
+
+                                        // Check if re-adding (session already has messages)
                                         const isReAdd = loadChatMessages(newSession.id).length > 0;
+
+                                        // Resolve character-bound user identity
                                         const charIdentity = resolveUserIdentity(addResult.id, "chat");
                                         const userName = charIdentity?.name || identity?.name || "你";
+
+                                        // 3. Insert system message(s)
                                         if (isReAdd) {
+                                            // Re-add: single message with both lines for memory
                                             const charName = addResult.name || "用户";
-                                            pushChatMessage({ sessionId: newSession.id, role: "system", content: `${userName}向${charName}发起了好友申请\n${charName}通过了好友申请`, status: "sent" });
+                                            pushChatMessage({
+                                                sessionId: newSession.id,
+                                                role: "system",
+                                                content: `${userName}向${charName}发起了好友申请\n${charName}通过了好友申请`,
+                                                status: "sent"
+                                            });
+                                            // Set flag to trigger AI reply on chat room mount
                                             kvSet(PENDING_REPLY_PREFIX + newSession.id, "1");
                                         } else {
-                                            pushChatMessage({ sessionId: newSession.id, role: "system", content: `${userName}已添加了${addResult.name || "用户"}，现在可以开始聊天了。`, status: "sent" });
+                                            pushChatMessage({
+                                                sessionId: newSession.id,
+                                                role: "system",
+                                                content: `${userName}已添加了${addResult.name || "用户"}，现在可以开始聊天了。`,
+                                                status: "sent"
+                                            });
                                         }
+
+                                        // 4. Insert user greeting message if any
                                         if (greetingText.trim()) {
-                                            pushChatMessage({ sessionId: newSession.id, role: "user", content: greetingText.trim(), status: "sent" });
+                                            pushChatMessage({
+                                                sessionId: newSession.id,
+                                                role: "user",
+                                                content: greetingText.trim(),
+                                                status: "sent"
+                                            });
                                         }
-                                        refresh();
+
+                                        // 6. Open Chat
                                         onSelectSession(newSession);
-                                        addFromCardRef.current = false;
                                         setIsAddFriendOpen(false);
+                                        setAddQuery("");
+                                        setAddResult(undefined);
+                                        setIsSendingAdd(false);
                                     }}
                                     className="ui-btn ui-btn-success w-full"
-                                >发送</button>
-                                <button onClick={() => setIsSendingAdd(false)} className="ui-btn ui-btn-ghost w-full">取消</button>
+                                >
+                                    发送
+                                </button>
+                                <button
+                                    onClick={() => setIsSendingAdd(false)}
+                                    className="ui-btn ui-btn-ghost w-full"
+                                >
+                                    取消
+                                </button>
                             </div>
                         </div>
                     )}

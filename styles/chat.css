@@ -2724,8 +2724,9 @@
   border-radius: var(--ui-radius-card);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  padding: 16px;
+  gap: 20px 14px;
+  padding: 18px 14px 22px;
+  min-height: 280px;
   content-visibility: auto;
   transform-origin: top center;
   animation: chatPanelExpand 180ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -2733,9 +2734,9 @@
 
 /* ── Plus menu icon box ── */
 .chat-plus-icon-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   border: 1px solid transparent;
   background: var(--c-panel);
   display: flex;

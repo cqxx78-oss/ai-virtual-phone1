@@ -344,7 +344,7 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
         const img = new Image();
         const objectUrl = URL.createObjectURL(file);
         img.onload = () => {
-            const maxSize = 800;
+            const maxSize = 2048;
             let w = img.width, h = img.height;
             if (w > maxSize || h > maxSize) {
                 if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
@@ -354,6 +354,8 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
             canvas.width = w;
             canvas.height = h;
             const ctx = canvas.getContext("2d")!;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
             ctx.drawImage(img, 0, 0, w, h);
             canvas.toBlob(blob => {
                 URL.revokeObjectURL(objectUrl);
@@ -364,7 +366,7 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
                         if (url) setCoverUrl(url);
                     });
                 });
-            }, "image/jpeg", 0.8);
+            }, "image/jpeg", 0.95);
         };
         img.src = objectUrl;
         // Reset so same file can be re-selected

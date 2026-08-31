@@ -51,7 +51,6 @@ type ChatMessageListProps = {
 export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, onSelectMascot }: ChatMessageListProps) {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [listFilter, setListFilter] = useState("");
-    const [listTab, setListTab] = useState<"all" | "private" | "group">("all");
     const [showPlusMenu, setShowPlusMenu] = useState(false);
     const plusMenuRef = React.useRef<HTMLSpanElement>(null);
     useEffect(() => {
@@ -188,9 +187,6 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                 }
             >
                 <div className="px-5 pt-5 pb-3">
-                    <div className="flex items-center justify-between mb-4 mt-2">
-                        <span className="ts-28 font-bold text-[var(--c-text-title)]">Chats</span>
-                    </div>
                     <div className="chat-search-bar">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c-icon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input
@@ -201,32 +197,17 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                         />
                     </div>
                 </div>
-                <div className="chat-list-tabs" style={{ paddingLeft: 20, paddingRight: 20 }}>
-                    {(["all", "private", "group"] as const).map(tab => (
-                        <button
-                            key={tab}
-                            type="button"
-                            className={`chat-list-tab${listTab === tab ? " active" : ""}`}
-                            onClick={() => setListTab(tab)}
-                        >
-                            {{ all: "All", private: "Private", group: "Groups" }[tab]}
-                        </button>
-                    ))}
-                </div>
                 <div className="px-5 pt-2 flex flex-col">
                     {(() => {
                             const contactIds = new Set(loadChatContacts().map(c => c.characterId));
                             const allChars = loadCharacters();
                             const keyword = listFilter.trim().toLowerCase();
                             const showMascot = mascotSettings.chatEnabled
-                                && listTab !== "group"
                                 && (!keyword || (mascotSettings.nickname || "AI助手").toLowerCase().includes(keyword));
                             const regularItems = [...sessions]
                             .filter(s => {
                                 if (!(s.isGroup || contactIds.has(s.contactId))) return false;
                                 if (!getLastVisibleSessionMessage(s.id)) return false;
-                                if (listTab === "private" && s.isGroup) return false;
-                                if (listTab === "group" && !s.isGroup) return false;
                                 if (!keyword) return true;
                                 if (s.isGroup) return (s.groupName || "群聊").toLowerCase().includes(keyword);
                                 const name = s.alias || allChars.find(c => c.id === s.contactId)?.name || "";
@@ -574,7 +555,7 @@ function MascotSessionItem({
     onSelect: () => void;
 }) {
     return (
-        <div className="minimal-list-item" onClick={onSelect}>
+        <div className="minimal-list-item chat-pinned" onClick={onSelect}>
             <div className="minimal-avatar-wrapper bg-white">
                 <img src={avatarUrl} className="w-full h-full object-contain pointer-events-none rounded-full p-[2px]" alt="" />
                 <span className="minimal-online-dot" />

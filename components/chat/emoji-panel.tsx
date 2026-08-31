@@ -80,7 +80,7 @@ export function EmojiPanel({ onSelect, onEffectSend }: EmojiPanelProps) {
     const showEffectTab = enabledEffects.length > 0;
 
     return (
-        <div className="h-[220px] flex flex-col">
+        <div className="h-[280px] flex flex-col pt-1">
             <div className="flex gap-0.5 px-2 py-1 overflow-x-auto shrink-0 hide-scrollbar">
                 {showEffectTab && (
                     <button
@@ -168,7 +168,7 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
     const activePack = stickerPacks.find(pack => pack.id === activePackId) ?? stickerPacks[0] ?? null;
 
     return (
-        <div className="h-[220px] flex flex-col">
+        <div className="h-[280px] flex flex-col pt-1">
             {stickerPacks.length > 0 && (
                 <div className="flex gap-0.5 px-2 py-1 overflow-x-auto shrink-0 hide-scrollbar">
                     {stickerPacks.map(pack => (
@@ -183,7 +183,7 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                     ))}
                 </div>
             )}
-            <div className="flex-1 overflow-auto p-2 grid grid-cols-5 gap-1 content-start hide-scrollbar">
+            <div className="flex-1 overflow-auto px-2 py-1 grid grid-cols-5 gap-x-1 gap-y-2 content-start hide-scrollbar">
                 {!activePack && (
                     <div className="col-span-5 flex items-center justify-center text-[var(--c-text-muted)] ts-12 py-8">
                         暂无表情包，请在角色设置里上传或绑定。
@@ -196,16 +196,16 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                             key={`${activePack.id}:${sticker.id}`}
                             onClick={() => onSend(sticker.name, url)}
                             title={sticker.name}
-                            className="border-none bg-transparent cursor-pointer p-1 rounded-lg flex flex-col items-center justify-start gap-0.5 min-h-[62px] min-w-0 overflow-hidden"
+                            className="border-none bg-transparent cursor-pointer p-0.5 rounded-lg flex flex-col items-center justify-start gap-1 min-w-0 overflow-hidden"
                         >
-                            <div className="w-9 h-9 flex items-center justify-center shrink-0">
+                            <div className="w-14 h-14 flex items-center justify-center shrink-0">
                                 {url ? (
-                                    <img src={url} alt={sticker.name} className="w-9 h-9 object-contain" />
+                                    <img src={url} alt={sticker.name} className="w-14 h-14 object-contain" />
                                 ) : (
-                                    <span className="ts-9 text-[var(--c-text)] max-w-full truncate">{sticker.name}</span>
+                                    <span className="ts-11 text-[var(--c-text)] max-w-full truncate">{sticker.name}</span>
                                 )}
                             </div>
-                            <span className="ts-9 leading-tight text-[var(--c-text)] opacity-75 w-full text-center truncate">
+                            <span className="ts-10 leading-tight text-[var(--c-text)] opacity-75 w-full text-center truncate">
                                 {sticker.name}
                             </span>
                         </button>
