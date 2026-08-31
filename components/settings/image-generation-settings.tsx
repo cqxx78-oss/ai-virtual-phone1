@@ -21,7 +21,17 @@ import { Alert } from "@/components/ui/feedback";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { Input, Select, Textarea, Toggle } from "@/components/ui/form";
 
-const SIZE_PRESETS = ["auto", "1024x1024", "1024x1536", "1536x1024"] as const;
+const SIZE_PRESET_ITEMS = [
+    { value: "auto", label: "auto" },
+    { value: "1024x1024", label: "1024×1024 (2K)" },
+    { value: "1536x1024", label: "1536×1024 (2K)" },
+    { value: "1920x1080", label: "1920×1080 (2K)" },
+    { value: "2048x2048", label: "2048×2048 (4K)" },
+    { value: "2560x1712", label: "2560×1712 (4K)" },
+    { value: "3840x2160", label: "3840×2160 (4K)" },
+] as const;
+
+const SIZE_PRESETS = SIZE_PRESET_ITEMS.map(i => i.value);
 const SIZE_OPTIONS = [...SIZE_PRESETS, "custom"];
 const QUALITY_OPTIONS = ["auto", "low", "medium", "high"];
 
@@ -624,9 +634,10 @@ export function ImageGenerationSettings() {
                                         value={isCustomSize(editingProfile.size) ? "custom" : editingProfile.size}
                                         onChange={(event) => selectSize(editingProfile, event.target.value)}
                                     >
-                                        {SIZE_OPTIONS.map(option => (
-                                            <option key={option} value={option}>{option === "custom" ? "自定义…" : option}</option>
+                                        {SIZE_PRESET_ITEMS.map(item => (
+                                            <option key={item.value} value={item.value}>{item.label}</option>
                                         ))}
+                                        <option value="custom">自定义…</option>
                                     </Select>
                                 </div>
                                 <div className="flex flex-col gap-1">
