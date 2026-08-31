@@ -1,7 +1,9 @@
 "use client";
 
 import { Component, memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ErrorInfo, type ReactNode } from "react";
-import { pushNav } from "@/lib/navigation-stack";
+import { pushNav, registerDesktopExitHandler } from "@/lib/navigation-stack";
+import { ConfirmDialog } from "@/components/ui/modal";
+import { AlertCircle } from "lucide-react";
 
 import { updateStatusBarTone } from "@/lib/bg-tone";
 import { startDiaryEntryTimerService, stopDiaryEntryTimerService } from "@/lib/diary-entry-timer-service";
@@ -1118,6 +1120,15 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   );
   const [savedTheme, setSavedTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
   const [draftTheme, setDraftTheme] = useState<ThemeProfile>(() => initialThemeProfile ?? readInitialThemeProfile());
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  // 注册桌面层（当栈底已空时）按下物理返回键的拦截：弹窗确认是否退出小手机
+  useEffect(() => {
+    return registerDesktopExitHandler(() => {
+      setShowExitConfirm(true);
+    });
+  }, []);
+
   useEffect(() => {
     activeAppRef.current = activeApp;
     if (activeApp) {
@@ -4827,6 +4838,28 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
               <MascotFloat />
               {/* 预览弹窗宿主：独立于桌宠的展开/收起状态，否则桌宠收成小球时弹不出来 */}
               <MascotPreviewHost />
+
+              {/* 桌面层返回键退出小手机确认弹窗 */}
+              {showExitConfirm && (
+                <ConfirmDialog
+                  title="退出小手机？"
+                  message="确定要关闭并退出小手机互动应用吗？"
+                  icon={AlertCircle}
+                  variant="primary"
+                  confirmLabel="退出"
+                  cancelLabel="继续使用"
+                  onConfirm={() => {
+                    setShowExitConfirm(false);
+                    try {
+                      // 确认退出：连退两格释放桌面底帧，自然返回到设备桌面/上一个网页
+                      window.history.go(-2);
+                    } catch {
+                      window.close();
+                    }
+                  }}
+                  onCancel={() => setShowExitConfirm(false)}
+                />
+              )}
 
               {/* Widget Picker Bottom Sheet */}
               {showWidgetPicker && (

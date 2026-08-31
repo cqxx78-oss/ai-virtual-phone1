@@ -9,32 +9,57 @@ type NavEntry = {
 let nextId = 1;
 const stack: NavEntry[] = [];
 let initialized = false;
+let desktopExitHandler: (() => void) | null = null;
 
 function initGlobalPopStateListener() {
   if (typeof window === "undefined" || initialized) return;
   initialized = true;
 
+  // 桌面初始化时，向浏览器压入一个根底帧，用于捕获在桌面上按返回键的行为，防止直接退出 PWA
+  try {
+    window.history.pushState({ __isDesktopRoot: true }, "");
+  } catch {}
+
   window.addEventListener("popstate", (event) => {
-    const navId = (event.state as { __navId?: number } | null)?.__navId;
-
-    if (stack.length === 0) return;
-
-    // 正常出栈：物理返回键回退到上一个历史条目
-    const top = stack.pop();
-    if (top) {
+    if (stack.length > 0) {
+      // 导航栈中有层级：按顺序正常出栈回退上一层（聊天室→列表、子页面→主页、应用→桌面等）
+      const top = stack.pop();
+      if (top) {
+        try {
+          top.onPop();
+        } catch (err) {
+          console.error("[NavStack] Error in onPop handler:", err);
+        }
+      }
+    } else {
+      // 栈已空（当前已经在小手机桌面上）：
+      // 重新推入底帧保持在当前页，并触发退出确认弹窗，防止误触直接退出 PWA
       try {
-        top.onPop();
-      } catch (err) {
-        console.error("[NavStack] Error in onPop handler:", err);
+        window.history.pushState({ __isDesktopRoot: true }, "");
+      } catch {}
+      if (desktopExitHandler) {
+        desktopExitHandler();
       }
     }
   });
 }
 
 /**
+ * 注册在小手机桌面按返回键时的拦截确认回调
+ */
+export function registerDesktopExitHandler(handler: (() => void) | null): () => void {
+  desktopExitHandler = handler;
+  if (typeof window !== "undefined") {
+    initGlobalPopStateListener();
+  }
+  return () => {
+    if (desktopExitHandler === handler) desktopExitHandler = null;
+  };
+}
+
+/**
  * 进入一个可回退的子页面 / 应用 / 弹层时调用。
  * 向浏览器历史栈压入一层记录，并注册回退时的回调。
- * 返回一个 cancel 函数，用于在组件非回退原因销毁时（例如强制卸载）自动清理栈。
  */
 export function pushNav(onPop: () => void, tag?: string): () => void {
   if (typeof window === "undefined") return () => {};
@@ -49,9 +74,6 @@ export function pushNav(onPop: () => void, tag?: string): () => void {
   } catch {}
 
   return () => {
-    // 当组件通过 UI 正常状态切换卸载时（例如主动调用了 onBack/关闭），
-    // 我们只把 entry 从我们的 JS 栈中移除，不要调用 history.back()，
-    // 以免异步触发 popstate 造成二次回退误杀上一层！
     const idx = stack.findIndex(e => e.id === entryId);
     if (idx !== -1) {
       stack.splice(idx, 1);
@@ -61,8 +83,6 @@ export function pushNav(onPop: () => void, tag?: string): () => void {
 
 /**
  * 主动回退一层：供屏幕左上角的 UI 返回按钮统一调用。
- * 直接触发浏览器的 history.back()，让 popstate 统一分发 onPop，
- * 从而实现「点击虚拟返回键」与「手机物理返回键」100% 走完全一致的逻辑！
  */
 export function popNav(): void {
   if (typeof window === "undefined") return;
