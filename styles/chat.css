@@ -52,6 +52,14 @@
   --chat-bottom-reserve: 120px;
 }
 
+.chat-app .chat-room-wrapper.page-shell[data-has-bg-image] > .page-body {
+  background-color: transparent !important;
+}
+
+.chat-app .chat-room-layer:has(.chat-room-wrapper[data-has-bg-image]) {
+  background: transparent !important;
+}
+
 .chat-app .chat-room-wrapper .page-header {
   position: absolute;
   top: 0;

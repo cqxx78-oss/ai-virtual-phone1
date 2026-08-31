@@ -652,6 +652,7 @@ export function ChatSettingsPanel({
             sessions[sessIdx] = { ...sessions[sessIdx], ...updates };
             saveChatSessions(sessions);
             Object.assign(session, updates);
+            window.dispatchEvent(new CustomEvent("chat-session-updated", { detail: { sessionId: session.id, updates } }));
         }
     };
 

@@ -52,7 +52,7 @@ import { useKeyboardDismissAutoSend } from "@/components/chat/use-keyboard-dismi
 import { cancelBailoutKey } from "@/lib/push-bailout-client";
 import { PENDING_REPLY_PREFIX } from "@/lib/friend-request-engine";
 import type { UserIdentity } from "@/components/settings/user-identity";
-import { AlertCircle, Blocks, Check, Trash2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
+import { AlertCircle, Blocks, Check, Trash2, User, ChevronLeft, ChevronRight, ChevronUp, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
 import { setDebugChatState } from "@/lib/debug-store";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
 import { setChatActive } from "@/lib/music-action-queue";
@@ -1193,10 +1193,14 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
         return () => window.removeEventListener(CHAT_PLUGIN_TOAST_EVENT, handler);
     }, []);
 
+    const [currentBgImage, setCurrentBgImage] = useState<string | undefined>(session.backgroundImage);
     const [bgImageResolved, setBgImageResolved] = useState<string | null>(null);
     const [bgLoading, setBgLoading] = useState(!!session.backgroundImage);
 
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const [unreadJumpFirstId, setUnreadJumpFirstId] = useState<string | null>(null);
+    const [unreadJumpCount, setUnreadJumpCount] = useState(0);
+    const initialMountedUnreadCountRef = useRef<number>(session.unreadCount || 0);
 
     // 全屏特效：命中触发词的新消息播放表情雨/礼花（微信同款）
     const [activeScreenEffect, setActiveScreenEffect] = useState<ActiveScreenEffect | null>(null);
@@ -1253,27 +1257,40 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     }, [messages]);
 
     useEffect(() => {
-        if (!session.backgroundImage) {
+        const onSessionUpdated = (e: Event) => {
+            const detail = (e as CustomEvent<{ sessionId?: string; updates?: Partial<ChatSession> }>).detail;
+            if (detail?.sessionId === session.id && detail.updates) {
+                if ("backgroundImage" in detail.updates) {
+                    setCurrentBgImage(detail.updates.backgroundImage);
+                }
+            }
+        };
+        window.addEventListener("chat-session-updated", onSessionUpdated);
+        return () => window.removeEventListener("chat-session-updated", onSessionUpdated);
+    }, [session.id]);
+
+    useEffect(() => {
+        if (!currentBgImage) {
             setBgImageResolved(null);
             setBgLoading(false);
             return;
         }
-        if (session.backgroundImage.startsWith("data:") || session.backgroundImage.startsWith("http")) {
-            setBgImageResolved(session.backgroundImage);
+        if (currentBgImage.startsWith("data:") || currentBgImage.startsWith("http")) {
+            setBgImageResolved(currentBgImage);
             setBgLoading(false);
             return;
         }
         // It's an ID — load from IndexedDB
         setBgLoading(true);
         import("@/lib/chat-asset-storage").then(({ getChatImageFromIndexedDB }) => {
-            getChatImageFromIndexedDB(session.backgroundImage!).then(dataUrl => {
+            getChatImageFromIndexedDB(currentBgImage!).then(dataUrl => {
                 if (dataUrl) {
                     setBgImageResolved(dataUrl);
                 }
                 setBgLoading(false);
             });
         });
-    }, [session.backgroundImage]);
+    }, [currentBgImage]);
 
     // Message Actions state
     const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
@@ -2025,6 +2042,25 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
             el.scrollTop = el.scrollHeight;
         }
         prevMsgCountRef.current = displayMessages.length;
+
+        // 检测未读定位按钮展示条件（微信同款）：
+        // 当会话有较多未读新消息（首条未读消息在当前视口上方不可见）时，展示定位按钮
+        const unreadCount = initialMountedUnreadCountRef.current;
+        if (unreadCount >= 4 && displayMessages.length >= unreadCount && el) {
+            const unreadStartIndex = displayMessages.length - unreadCount;
+            const firstUnread = displayMessages[unreadStartIndex];
+            if (firstUnread) {
+                const targetEl = document.getElementById(`message-${firstUnread.id}`);
+                if (targetEl) {
+                    const containerRect = el.getBoundingClientRect();
+                    const targetRect = targetEl.getBoundingClientRect();
+                    if (targetRect.bottom < containerRect.top + 30) {
+                        setUnreadJumpFirstId(firstUnread.id);
+                        setUnreadJumpCount(unreadCount);
+                    }
+                }
+            }
+        }
     }, [displayMessages, flashMessageHighlight, restoreScrollAnchor, watchLoadMoreAnchorImages]);
 
     useLayoutEffect(() => {
@@ -5248,12 +5284,67 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 className="chat-plugin-header chat-room-main-pane"
             />
 
+            {/* 微信同款未读消息定位浮动条 */}
+            {unreadJumpFirstId && (
+                <div className="chat-unread-jump-wrap" style={{
+                    position: "absolute",
+                    top: "calc(var(--safe-area-top, 48px) + var(--page-header-content-height, 42px) + 12px + var(--chat-plugin-header-height, 0px))",
+                    right: 14,
+                    zIndex: 15,
+                }}>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const targetId = unreadJumpFirstId;
+                            setUnreadJumpFirstId(null);
+                            const el = scrollRef.current;
+                            if (el && targetId) {
+                                const target = document.getElementById(`message-${targetId}`);
+                                if (target) {
+                                    scrollElementWithinContainer(el, target, { behavior: "smooth", block: "start" });
+                                    flashMessageHighlight(targetId);
+                                }
+                            }
+                        }}
+                        className="chat-unread-jump-btn"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "6px 12px",
+                            borderRadius: 999,
+                            background: "var(--c-card, #ffffff)",
+                            color: "var(--c-icon-active, #07c160)",
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
+                            border: "1px solid var(--c-border, rgba(0,0,0,0.08))",
+                            fontSize: "calc(12px*var(--app-text-scale,1))",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                        }}
+                    >
+                        <ChevronUp size={16} strokeWidth={2.2} />
+                        <span>{unreadJumpCount}条新消息</span>
+                    </button>
+                </div>
+            )}
+
             {/* Message List */}
             <div
                 ref={scrollRef}
                 className="page-body chat-room-main-pane flex flex-col gap-4 chat-scroll-anchored"
                 onScroll={(e) => {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
+                    if (unreadJumpFirstId) {
+                        const el = scrollRef.current;
+                        const target = document.getElementById(`message-${unreadJumpFirstId}`);
+                        if (el && target) {
+                            const containerRect = el.getBoundingClientRect();
+                            const targetRect = target.getBoundingClientRect();
+                            if (targetRect.top >= containerRect.top && targetRect.top <= containerRect.bottom) {
+                                setUnreadJumpFirstId(null);
+                            }
+                        }
+                    }
                 }}
                 onPointerDown={(e) => {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
