@@ -173,6 +173,26 @@ export function ImageGenerationSettings() {
             }];
     }, [settings]);
 
+    const [selectedGroup, setSelectedGroup] = useState<string>("全部");
+
+    const allGroups = useMemo(() => {
+        const groups = new Set<string>();
+        profiles.forEach(p => {
+            const g = (p.group || "").trim();
+            if (g) groups.add(g);
+            else groups.add("默认");
+        });
+        return ["全部", ...Array.from(groups)];
+    }, [profiles]);
+
+    const displayedProfiles = useMemo(() => {
+        if (selectedGroup === "全部") return profiles;
+        return profiles.filter(p => {
+            const g = (p.group || "").trim() || "默认";
+            return g === selectedGroup;
+        });
+    }, [profiles, selectedGroup]);
+
     const activeProfileId = settings.activeProfileId || profiles[0]?.id || "img-profile-default";
     const editingProfile = useMemo(() => {
         if (!editingId) return null;
@@ -662,8 +682,27 @@ export function ImageGenerationSettings() {
                     <span className="menu-desc text-xs">点击卡片设为当前使用</span>
                 </div>
 
+                {allGroups.length > 2 && (
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+                        {allGroups.map((grp) => (
+                            <button
+                                key={grp}
+                                type="button"
+                                onClick={() => setSelectedGroup(grp)}
+                                className={`px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${
+                                    selectedGroup === grp
+                                        ? "bg-black text-white shadow-sm"
+                                        : "bg-black/5 text-black/60 hover:bg-black/10"
+                                }`}
+                            >
+                                {grp}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3 relative">
-                    {profiles.map(profile => {
+                    {displayedProfiles.map(profile => {
                         const isActive = profile.id === activeProfileId;
                         const isDragging = draggingId === profile.id;
                         return (
@@ -822,6 +861,16 @@ export function ImageGenerationSettings() {
                                     value={editingProfile.name || ""}
                                     onChange={(e) => updateProfile(editingProfile.id, { name: e.target.value })}
                                     placeholder="例如: 快速生图 / 高清人像"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                                <label className="menu-desc ml-1">所属分组 (留空为默认)</label>
+                                <Input
+                                    type="text"
+                                    value={editingProfile.group || ""}
+                                    onChange={(e) => updateProfile(editingProfile.id, { group: e.target.value })}
+                                    placeholder="例如: 动漫 / 写实 / 快速 (留空默认)"
                                 />
                             </div>
 

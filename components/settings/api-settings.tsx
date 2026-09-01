@@ -45,6 +45,7 @@ export function ApiSettings() {
     const [modelQuery, setModelQuery] = useState<Record<string, string>>({});
     const [isTesting, setIsTesting] = useState<Record<string, boolean>>({});
     const [testResult, setTestResult] = useState<Record<string, { success: boolean; message: string }>>({});
+    const [selectedGroup, setSelectedGroup] = useState<string>("全部");
 
     // Load from localStorage on mount
     useEffect(() => {
@@ -307,6 +308,25 @@ export function ApiSettings() {
         setTestResult(newTestResults);
     };
 
+    // 分组提取与过滤
+    const allGroups = useMemo(() => {
+        const groups = new Set<string>();
+        configs.forEach(c => {
+            const g = (c.group || "").trim();
+            if (g) groups.add(g);
+            else groups.add("默认");
+        });
+        return ["全部", ...Array.from(groups)];
+    }, [configs]);
+
+    const displayedConfigs = useMemo(() => {
+        if (selectedGroup === "全部") return configs;
+        return configs.filter(c => {
+            const g = (c.group || "").trim() || "默认";
+            return g === selectedGroup;
+        });
+    }, [configs, selectedGroup]);
+
     // 模型下拉搜索：按关键词实时过滤已拉取模型（大小写不敏感）
     const filteredModels = useMemo(() => {
         const result: Record<string, string[]> = {};
@@ -441,8 +461,27 @@ export function ApiSettings() {
                     </button>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-3 relative">
-                    {configs.map((config) => {
+                <div className="flex flex-col gap-3">
+                    {allGroups.length > 2 && (
+                        <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+                            {allGroups.map((grp) => (
+                                <button
+                                    key={grp}
+                                    type="button"
+                                    onClick={() => setSelectedGroup(grp)}
+                                    className={`px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${
+                                        selectedGroup === grp
+                                            ? "bg-black text-white shadow-sm"
+                                            : "bg-black/5 text-black/60 hover:bg-black/10"
+                                    }`}
+                                >
+                                    {grp}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3 relative">
+                    {displayedConfigs.map((config) => {
                         const isDragging = draggingId === config.id;
                         return (
                             <div
@@ -538,6 +577,7 @@ export function ApiSettings() {
                             </div>
                         );
                     })()}
+                    </div>
                 </div>
             )}
 
@@ -563,6 +603,15 @@ export function ApiSettings() {
                                                 value={config.name || ""}
                                                 onChange={(e) => updateConfig(config.id, { name: e.target.value })}
                                                 placeholder="例如: 我的 OpenAI"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <label className="menu-desc ml-1">所属分组 (留空为默认)</label>
+                                            <Input
+                                                type="text"
+                                                value={config.group || ""}
+                                                onChange={(e) => updateConfig(config.id, { group: e.target.value })}
+                                                placeholder="例如: 主力 / 备用 / 翻译 (留空默认)"
                                             />
                                         </div>
                                         <div className="flex flex-col gap-1">

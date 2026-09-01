@@ -116,6 +116,7 @@ export type RegexConfig = SettingItemMeta & {
 export type ApiConfig = {
     id: string;
     name?: string;
+    group?: string;
     provider: string;
     apiKey: string;
     baseUrl?: string;
@@ -164,6 +165,7 @@ export type ImageHostingSettings = {
 export type ImageGenerationProfile = {
     id: string;
     name?: string;
+    group?: string;
     requestMode: ImageGenerationRequestMode;
     apiKey: string;
     baseUrl: string;
