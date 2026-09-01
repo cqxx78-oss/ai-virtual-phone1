@@ -481,7 +481,7 @@ export function ApiSettings() {
                 </div>
             ) : (
                 <div className="flex flex-col gap-3">
-                    {allGroups.length > 2 && (
+                    {allGroups && allGroups.length > 2 && (
                         <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
                             {allGroups.map((grp) => (
                                 <button
