@@ -632,7 +632,6 @@ export default function MusicApp({ onClose }: Props) {
                             onUpdateTrack={handleUpdateTrack}
                             categories={categories}
                             onToggleLike={handleToggleLocalLike}
-                            onSwipeCategory={switchCategoryByOffset}
                         />
                     )}
                 </>
@@ -1521,7 +1520,7 @@ function NeteaseSongRow({ song, index, formatTime, onPlay }: {
 }
 
 // ── Song List (local) ──
-function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack, categories, onToggleLike, onSwipeCategory }: {
+function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack, categories, onToggleLike }: {
     tracks: MusicTrack[];
     player: MusicControlsValue;
     formatTime: (s: number) => string;
@@ -1530,7 +1529,6 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
     onUpdateTrack: (id: string, updates: Partial<MusicTrack>) => void;
     categories?: string[];
     onToggleLike?: (trackId: string) => void;
-    onSwipeCategory?: (offset: -1 | 1) => void;
 }) {
     const [deleteTarget, setDeleteTarget] = useState<MusicTrack | null>(null);
     const [editingTrack, setEditingTrack] = useState<MusicTrack | null>(null);
@@ -1577,40 +1575,8 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
         setEditingTrack(null);
     };
 
-    const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-
     return (
-        <div
-            className="music-list"
-            onTouchStart={(e) => {
-                const touch = e.touches[0];
-                touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-            }}
-            onTouchEnd={(e) => {
-                const start = touchStartRef.current;
-                touchStartRef.current = null;
-                if (!start || !onSwipeCategory || e.changedTouches.length === 0) return;
-                const touch = e.changedTouches[0];
-                const dx = touch.clientX - start.x;
-                const dy = touch.clientY - start.y;
-                if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-                    onSwipeCategory(dx < 0 ? 1 : -1);
-                }
-            }}
-            onTouchCancel={() => { touchStartRef.current = null; }}
-            onPointerDown={(e) => { swipeRef.current = { x: e.clientX, y: e.clientY }; }}
-            onPointerUp={(e) => {
-                const start = swipeRef.current;
-                swipeRef.current = null;
-                if (!start || !onSwipeCategory) return;
-                const dx = e.clientX - start.x;
-                const dy = e.clientY - start.y;
-                if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-                    onSwipeCategory(dx < 0 ? 1 : -1);
-                }
-            }}
-            onPointerCancel={() => { swipeRef.current = null; }}
-        >
+        <div className="music-list">
             {tracks.map((track, idx) => {
                 const isCurrent = player.currentTrack?.id === track.id;
                 return (
