@@ -209,7 +209,7 @@ export function QuickActionFloat() {
         return {
             left: rect.left - parentRect.left,
             top: rect.top - parentRect.top,
-            maxLeft: Math.max(12, parentRect.width - rect.width - 12),
+            maxLeft: parentRect.width - rect.width,
             maxTop: Math.max(12, parentRect.height - rect.height - 12),
         };
     }
@@ -255,7 +255,7 @@ export function QuickActionFloat() {
             const currentLeft = floatingPosition?.left ?? drag.left;
             const midX = drag.maxLeft * DOCK_THRESHOLD;
             const snap: DockSide = currentLeft < midX ? "left" : "right";
-            const snapLeft = snap === "left" ? - (64 - DOCK_BUTTON_WIDTH) : drag.maxLeft + (64 - DOCK_BUTTON_WIDTH);
+            const snapLeft = snap === "left" ? -24 : drag.maxLeft + 24;
             setFloatingPosition({ left: snapLeft, top: floatingPosition?.top ?? drag.top });
             setDockSide(snap);
         }
