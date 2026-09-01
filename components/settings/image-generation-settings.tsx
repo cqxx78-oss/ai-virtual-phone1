@@ -21,25 +21,39 @@ import { Alert } from "@/components/ui/feedback";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { Input, Select, Textarea, Toggle } from "@/components/ui/form";
 
-const DEFAULT_SIZE_PRESETS = [
+const PORTRAIT_SIZE_PRESETS = [
     { value: "auto", label: "auto" },
-    { value: "1024x1024", label: "1024×1024 (2K)" },
-    { value: "1024x1536", label: "1024×1536 (2K)" },
-    { value: "1080x1920", label: "1080×1920 (2K)" },
-    { value: "2048x2048", label: "2048×2048 (4K)" },
-    { value: "1712x2560", label: "1712×2560 (4K)" },
-    { value: "2160x3840", label: "2160×3840 (4K)" },
+    // 1K
+    { value: "1024x1024", label: "1024×1024 (1K, 1:1)" },
+    { value: "1024x1536", label: "1024×1536 (1K, 2:3)" },
+    { value: "864x1536", label: "864×1536 (1K, 9:16)" },
+    // 2K
+    { value: "2048x2048", label: "2048×2048 (2K, 1:1)" },
+    { value: "1280x1920", label: "1280×1920 (2K, 2:3)" },
+    { value: "1080x1920", label: "1080×1920 (2K, 9:16)" },
+    // 4K
+    { value: "2732x2732", label: "2732×2732 (4K, 1:1)" },
+    { value: "1712x2560", label: "1712×2560 (4K, 2:3)" },
+    { value: "2304x4096", label: "2304×4096 (4K, 9:16)" },
 ] as const;
 
 const LANDSCAPE_SIZE_PRESETS = [
-    { value: "1536x1024", label: "1536×1024 (2K)" },
-    { value: "1920x1080", label: "1920×1080 (2K)" },
-    { value: "2560x1712", label: "2560×1712 (4K)" },
-    { value: "3840x2160", label: "3840×2160 (4K)" },
+    // 1K
+    { value: "1024x1024", label: "1024×1024 (1K, 1:1)" },
+    { value: "1536x1024", label: "1536×1024 (1K, 3:2)" },
+    { value: "1536x864", label: "1536×864 (1K, 16:9)" },
+    // 2K
+    { value: "2048x2048", label: "2048×2048 (2K, 1:1)" },
+    { value: "1920x1280", label: "1920×1280 (2K, 3:2)" },
+    { value: "1920x1080", label: "1920×1080 (2K, 16:9)" },
+    // 4K
+    { value: "2732x2732", label: "2732×2732 (4K, 1:1)" },
+    { value: "2560x1712", label: "2560×1712 (4K, 3:2)" },
+    { value: "4096x2304", label: "4096×2304 (4K, 16:9)" },
 ] as const;
 
-const ALL_SIZE_PRESET_ITEMS = [...DEFAULT_SIZE_PRESETS, ...LANDSCAPE_SIZE_PRESETS];
-const SIZE_PRESETS = ALL_SIZE_PRESET_ITEMS.map(i => i.value);
+const ALL_SIZE_PRESET_ITEMS = [...PORTRAIT_SIZE_PRESETS, ...LANDSCAPE_SIZE_PRESETS];
+const SIZE_PRESETS = Array.from(new Set(ALL_SIZE_PRESET_ITEMS.map(i => i.value)));
 const SIZE_LABEL_MAP: Record<string, string> = Object.fromEntries(ALL_SIZE_PRESET_ITEMS.map(i => [i.value, i.label]));
 const QUALITY_OPTIONS = ["auto", "low", "medium", "high"];
 
@@ -63,7 +77,19 @@ const RATIO_HINT_MARKER = "【画面比例】";
 const SIZE_RATIO_HINTS: Record<string, string> = {
     "1024x1024": "正方形 1:1 构图，square 1:1 composition",
     "1024x1536": "竖向 2:3 构图，vertical portrait composition",
+    "864x1536": "竖向 9:16 构图，vertical portrait 9:16 composition",
     "1536x1024": "横向 3:2 构图，horizontal landscape composition",
+    "1536x864": "横向 16:9 构图，horizontal landscape 16:9 composition",
+    "2048x2048": "正方形 1:1 构图，square 1:1 composition",
+    "1280x1920": "竖向 2:3 构图，vertical portrait composition",
+    "1080x1920": "竖向 9:16 构图，vertical portrait 9:16 composition",
+    "1920x1280": "横向 3:2 构图，horizontal landscape composition",
+    "1920x1080": "横向 16:9 构图，horizontal landscape 16:9 composition",
+    "2732x2732": "正方形 1:1 构图，square 1:1 composition",
+    "1712x2560": "竖向 2:3 构图，vertical portrait composition",
+    "2304x4096": "竖向 9:16 构图，vertical portrait 9:16 composition",
+    "2560x1712": "横向 3:2 构图，horizontal landscape composition",
+    "4096x2304": "横向 16:9 构图，horizontal landscape 16:9 composition",
 };
 
 function ratioHintForSize(size: string): string | undefined {
@@ -650,7 +676,7 @@ export function ImageGenerationSettings() {
                                                         : "text-[var(--c-text-sub)] hover:text-black"
                                                 }`}
                                             >
-                                                默认
+                                                竖版
                                             </button>
                                             <button
                                                 type="button"
@@ -661,7 +687,7 @@ export function ImageGenerationSettings() {
                                                         : "text-[var(--c-text-sub)] hover:text-black"
                                                 }`}
                                             >
-                                                横屏
+                                                横版
                                             </button>
                                         </div>
                                     </div>
@@ -672,13 +698,13 @@ export function ImageGenerationSettings() {
                                         {/* 当前选中的值如果不属于当前 tab，先作为一项展示以防显示空白 */}
                                         {!isCustomSize(editingProfile.size) &&
                                             editingProfile.size !== "custom" &&
-                                            !(sizeTab === "default" ? DEFAULT_SIZE_PRESETS : LANDSCAPE_SIZE_PRESETS).some(i => i.value === editingProfile.size) && (
+                                            !(sizeTab === "default" ? PORTRAIT_SIZE_PRESETS : LANDSCAPE_SIZE_PRESETS).some(i => i.value === editingProfile.size) && (
                                                 <option value={editingProfile.size}>
                                                     {SIZE_LABEL_MAP[editingProfile.size] || editingProfile.size}
                                                 </option>
                                             )
                                         }
-                                        {(sizeTab === "default" ? DEFAULT_SIZE_PRESETS : LANDSCAPE_SIZE_PRESETS).map(item => (
+                                        {(sizeTab === "default" ? PORTRAIT_SIZE_PRESETS : LANDSCAPE_SIZE_PRESETS).map(item => (
                                             <option key={item.value} value={item.value}>{item.label}</option>
                                         ))}
                                         <option value="custom">自定义…</option>
