@@ -32,7 +32,7 @@ function getNativeToolProtocolLabel(config: ApiConfig): string {
 }
 
 export function ApiSettings() {
-    const { setSubpageRightAction } = useContext(SettingsContext);
+    const { setSubpageRightAction, setOverrideBack } = useContext(SettingsContext);
     const [configs, setConfigs] = useState<ApiConfig[]>([]);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isNewConfig, setIsNewConfig] = useState(false);
@@ -97,6 +97,24 @@ export function ApiSettings() {
     const updateConfig = (id: string, updates: Partial<ApiConfig>) => {
         persist(configs.map(c => c.id === id ? { ...c, ...updates } : c));
     };
+
+    // 弹窗打开时拦截全局返回键，优先关闭弹窗
+    useEffect(() => {
+        if (editingId) {
+            setOverrideBack(() => () => {
+                if (isNewConfig && editingId) {
+                    removeConfig(editingId);
+                }
+                setIsNewConfig(false);
+                setEditingId(null);
+            });
+        } else {
+            setOverrideBack(null);
+        }
+        return () => {
+            setOverrideBack(null);
+        };
+    }, [editingId, isNewConfig, removeConfig, setOverrideBack]);
 
     // 拖拽排序逻辑
     // 拖拽排序逻辑

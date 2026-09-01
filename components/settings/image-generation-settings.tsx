@@ -130,7 +130,7 @@ const imageGenerationIconStyle = { "--icon-color": "#0EA5E9" } as CSSProperties;
 type Status = { success: boolean; message: string };
 
 export function ImageGenerationSettings() {
-    const { setSubpageRightAction } = useContext(SettingsContext);
+    const { setSubpageRightAction, setOverrideBack } = useContext(SettingsContext);
     const [settings, setSettings] = useState<ImageGenerationSettingsType>(DEFAULT_IMAGE_GENERATION_SETTINGS);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isNewProfile, setIsNewProfile] = useState(false);
@@ -536,6 +536,24 @@ export function ImageGenerationSettings() {
         );
         return () => setSubpageRightAction("imageGeneration", null);
     }, [addProfile, setSubpageRightAction]);
+
+    // 弹窗打开时拦截全局返回键，优先关闭弹窗
+    useEffect(() => {
+        if (editingId) {
+            setOverrideBack(() => () => {
+                if (isNewProfile && editingId) {
+                    removeProfile(editingId);
+                }
+                setIsNewProfile(false);
+                setEditingId(null);
+            });
+        } else {
+            setOverrideBack(null);
+        }
+        return () => {
+            setOverrideBack(null);
+        };
+    }, [editingId, isNewProfile, removeProfile, setOverrideBack]);
 
     const selectSize = useCallback((profile: ImageGenerationProfile, value: string) => {
         if (value !== "custom") {
