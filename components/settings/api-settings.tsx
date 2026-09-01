@@ -329,8 +329,8 @@ export function ApiSettings() {
     // 分组提取与过滤
     const allGroups = useMemo(() => {
         const groups = new Set<string>();
-        configs.forEach(c => {
-            const g = (c.group || "").trim();
+        (configs || []).forEach(c => {
+            const g = (c?.group || "").trim();
             if (g) groups.add(g);
             else groups.add("默认");
         });
@@ -338,9 +338,10 @@ export function ApiSettings() {
     }, [configs]);
 
     const displayedConfigs = useMemo(() => {
+        if (!Array.isArray(configs)) return [];
         if (selectedGroup === "全部") return configs;
         return configs.filter(c => {
-            const g = (c.group || "").trim() || "默认";
+            const g = (c?.group || "").trim() || "默认";
             return g === selectedGroup;
         });
     }, [configs, selectedGroup]);

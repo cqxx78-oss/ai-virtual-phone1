@@ -177,8 +177,8 @@ export function ImageGenerationSettings() {
 
     const allGroups = useMemo(() => {
         const groups = new Set<string>();
-        profiles.forEach(p => {
-            const g = (p.group || "").trim();
+        (profiles || []).forEach(p => {
+            const g = (p?.group || "").trim();
             if (g) groups.add(g);
             else groups.add("默认");
         });
@@ -186,9 +186,10 @@ export function ImageGenerationSettings() {
     }, [profiles]);
 
     const displayedProfiles = useMemo(() => {
+        if (!Array.isArray(profiles)) return [];
         if (selectedGroup === "全部") return profiles;
         return profiles.filter(p => {
-            const g = (p.group || "").trim() || "默认";
+            const g = (p?.group || "").trim() || "默认";
             return g === selectedGroup;
         });
     }, [profiles, selectedGroup]);
