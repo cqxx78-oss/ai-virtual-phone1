@@ -67,6 +67,7 @@ export function QuickActionFloat() {
     const floatingButtonRef = useRef<HTMLButtonElement | null>(null);
     const floatingDragRef = useRef<FloatingDragState | null>(null);
     const suppressFloatingClickRef = useRef(false);
+    const lastClickTimeRef = useRef(0);
 
     const reloadData = useCallback(() => {
         const nextCharacters = loadCharacters();
@@ -272,8 +273,20 @@ export function QuickActionFloat() {
             suppressFloatingClickRef.current = false;
             return;
         }
-        reloadData();
-        setOpen(prev => !prev);
+        // 如果已经打开，单击直接关闭
+        if (open) {
+            setOpen(false);
+            return;
+        }
+        // 未打开时：需双击（350ms 内连点两次）触发打开
+        const now = Date.now();
+        if (now - lastClickTimeRef.current < 350) {
+            lastClickTimeRef.current = 0;
+            reloadData();
+            setOpen(true);
+        } else {
+            lastClickTimeRef.current = now;
+        }
     }
 
     if (!enabled) return null;
