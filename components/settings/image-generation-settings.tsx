@@ -220,6 +220,191 @@ export function ImageGenerationSettings() {
         saveImageGenerationSettings(next);
     }, []);
 
+    // 拖拽排序逻辑
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+    const touchStateRef = useRef<{
+        id: string;
+        startX: number;
+        startY: number;
+        grabOffsetX: number;
+        grabOffsetY: number;
+        width: number;
+        height: number;
+        activated: boolean;
+    } | null>(null);
+    const draggingIdRef = useRef<string | null>(null);
+    const isTouchDragRef = useRef(false);
+    const autoScrollRafRef = useRef<number | null>(null);
+    const latestClientYRef = useRef<number>(0);
+
+    // 全局指针事件(同时支持触屏 + 鼠标拖拽)
+    useEffect(() => {
+        const onMove = (clientX: number, clientY: number) => {
+            const state = touchStateRef.current;
+            if (!state || !state.activated) return;
+
+            const dx = clientX - state.startX;
+            const dy = clientY - state.startY;
+            const dist = Math.hypot(dx, dy);
+
+            // 长按未激活前,移动超过阈值就取消,允许正常滚动
+            if (!isTouchDragRef.current && dist > 10) {
+                state.activated = false;
+                touchStateRef.current = null;
+                return;
+            }
+
+            if (isTouchDragRef.current) {
+                latestClientYRef.current = clientY;
+                setDragPos({ x: clientX - state.grabOffsetX, y: clientY - state.grabOffsetY });
+
+                // 边缘自动滚动检测
+                const viewportHeight = window.innerHeight;
+                const scrollZone = 90;
+                const scrollContainer = document.querySelector(".page-body") as HTMLElement || document.scrollingElement || document.documentElement;
+
+                const checkAutoScroll = () => {
+                    if (!isTouchDragRef.current) {
+                        if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+                        autoScrollRafRef.current = null;
+                        return;
+                    }
+                    const currentY = latestClientYRef.current;
+                    if (currentY > viewportHeight - scrollZone) {
+                        const intensity = Math.min(1, (currentY - (viewportHeight - scrollZone)) / scrollZone);
+                        scrollContainer.scrollTop += intensity * 16;
+                    } else if (currentY < scrollZone) {
+                        const intensity = Math.min(1, (scrollZone - currentY) / scrollZone);
+                        scrollContainer.scrollTop -= intensity * 16;
+                    }
+                    autoScrollRafRef.current = requestAnimationFrame(checkAutoScroll);
+                };
+
+                if (!autoScrollRafRef.current && (clientY > viewportHeight - scrollZone || clientY < scrollZone)) {
+                    autoScrollRafRef.current = requestAnimationFrame(checkAutoScroll);
+                } else if (autoScrollRafRef.current && clientY >= scrollZone && clientY <= viewportHeight - scrollZone) {
+                    cancelAnimationFrame(autoScrollRafRef.current);
+                    autoScrollRafRef.current = null;
+                }
+
+                // 隐藏被拖拽的浮层，以精确探测下方真实的卡槽位置
+                const ghostEl = document.getElementById("image-drag-ghost");
+                if (ghostEl) ghostEl.style.pointerEvents = "none";
+                const targetEl = document.elementFromPoint(clientX, clientY);
+
+                const cardEl = targetEl?.closest("[data-profile-id]") as HTMLElement | null;
+                if (cardEl && draggingIdRef.current) {
+                    const hoverId = cardEl.getAttribute("data-profile-id");
+                    if (hoverId && hoverId !== draggingIdRef.current) {
+                        setSettings(prev => {
+                            const currProfiles = prev.profiles && prev.profiles.length > 0 ? prev.profiles : profiles;
+                            const fromIdx = currProfiles.findIndex(p => p.id === draggingIdRef.current);
+                            const toIdx = currProfiles.findIndex(p => p.id === hoverId);
+                            if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+                            const nextProfiles = [...currProfiles];
+                            const [item] = nextProfiles.splice(fromIdx, 1);
+                            nextProfiles.splice(toIdx, 0, item);
+                            const nextSettings = { ...prev, profiles: nextProfiles };
+                            saveImageGenerationSettings(nextSettings);
+                            return nextSettings;
+                        });
+                        if (navigator.vibrate) navigator.vibrate(15);
+                    }
+                }
+            }
+        };
+
+        const onTouchMove = (e: TouchEvent) => {
+            if (isTouchDragRef.current) {
+                e.preventDefault();
+            }
+            const touch = e.touches[0];
+            if (touch) onMove(touch.clientX, touch.clientY);
+        };
+
+        const onMouseMove = (e: MouseEvent) => {
+            if (!touchStateRef.current) return;
+            onMove(e.clientX, e.clientY);
+        };
+
+        const onUp = () => {
+            if (autoScrollRafRef.current) {
+                cancelAnimationFrame(autoScrollRafRef.current);
+                autoScrollRafRef.current = null;
+            }
+            if (touchStateRef.current && isTouchDragRef.current) {
+                document.body.style.overflow = "";
+                document.body.style.touchAction = "";
+            }
+            touchStateRef.current = null;
+            draggingIdRef.current = null;
+            setDraggingId(null);
+            setDragPos(null);
+            isTouchDragRef.current = false;
+        };
+
+        const onTouchEnd = () => onUp();
+        const onTouchCancel = () => onUp();
+        const onMouseUp = () => onUp();
+
+        document.addEventListener("touchmove", onTouchMove, { passive: false });
+        document.addEventListener("touchend", onTouchEnd);
+        document.addEventListener("touchcancel", onTouchCancel);
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+
+        return () => {
+            document.removeEventListener("touchmove", onTouchMove);
+            document.removeEventListener("touchend", onTouchEnd);
+            document.removeEventListener("touchcancel", onTouchCancel);
+            document.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseup", onMouseUp);
+        };
+    }, [profiles]);
+
+    const startDrag = (id: string, clientX: number, clientY: number) => {
+        const el = document.querySelector(`[data-profile-id="${id}"]`) as HTMLElement | null;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        touchStateRef.current = {
+            id,
+            startX: clientX,
+            startY: clientY,
+            grabOffsetX: clientX - rect.left,
+            grabOffsetY: clientY - rect.top,
+            width: rect.width,
+            height: rect.height,
+            activated: true,
+        };
+        isTouchDragRef.current = false;
+        draggingIdRef.current = id;
+
+        setTimeout(() => {
+            if (touchStateRef.current && touchStateRef.current.id === id && touchStateRef.current.activated) {
+                isTouchDragRef.current = true;
+                setDraggingId(id);
+                setDragPos({
+                    x: touchStateRef.current.startX - touchStateRef.current.grabOffsetX,
+                    y: touchStateRef.current.startY - touchStateRef.current.grabOffsetY,
+                });
+                document.body.style.overflow = "hidden";
+                document.body.style.touchAction = "none";
+                if (navigator.vibrate) navigator.vibrate(40);
+            }
+        }, 350);
+    };
+
+    const handleTouchStart = (id: string, e: React.TouchEvent) => {
+        const touch = e.touches[0];
+        if (touch) startDrag(id, touch.clientX, touch.clientY);
+    };
+
+    const handleMouseDown = (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        startDrag(id, e.clientX, e.clientY);
+    };
+
     const updateProfile = useCallback((profileId: string, patch: Partial<ImageGenerationProfile>) => {
         const nextProfiles = profiles.map(p => {
             if (p.id !== profileId) return p;
@@ -477,20 +662,35 @@ export function ImageGenerationSettings() {
                     <span className="menu-desc text-xs">点击卡片设为当前使用</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 relative">
                     {profiles.map(profile => {
                         const isActive = profile.id === activeProfileId;
+                        const isDragging = draggingId === profile.id;
                         return (
                             <div
                                 key={profile.id}
-                                className={`ui-config-card min-w-0 cursor-pointer transition-all ${
+                                data-profile-id={profile.id}
+                                onMouseDown={(e) => handleMouseDown(profile.id, e)}
+                                onTouchStart={(e) => handleTouchStart(profile.id, e)}
+                                className={`ui-config-card min-w-0 cursor-pointer select-none transition-all ${
                                     isActive ? "ring-2 ring-black shadow-sm" : ""
+                                } ${
+                                    isDragging ? "opacity-30 border-dashed border-2 border-black/40 scale-95" : ""
                                 }`}
-                                style={{ aspectRatio: "3 / 2", padding: "12px", justifyContent: "space-between" }}
+                                style={{
+                                    aspectRatio: "3 / 2",
+                                    padding: "12px",
+                                    justifyContent: "space-between",
+                                    touchAction: "manipulation",
+                                    transition: "transform 200ms ease, opacity 200ms ease",
+                                }}
                                 role="button"
                                 tabIndex={0}
                                 aria-label={`选择 ${profile.name || "未命名方案"}`}
-                                onClick={() => setActiveProfile(profile.id)}
+                                onClick={() => {
+                                    if (isTouchDragRef.current) return;
+                                    setActiveProfile(profile.id);
+                                }}
                                 onKeyDown={(event) => {
                                     if (event.target !== event.currentTarget) return;
                                     if (event.key === "Enter" || event.key === " ") {
@@ -499,7 +699,7 @@ export function ImageGenerationSettings() {
                                     }
                                 }}
                             >
-                                <div className="min-w-0 flex flex-col gap-1">
+                                <div className="min-w-0 flex flex-col gap-1 pointer-events-none">
                                     <div className="flex items-center gap-1.5 min-w-0">
                                         <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">
                                             {profile.name || "未命名方案"}
@@ -543,6 +743,47 @@ export function ImageGenerationSettings() {
                             </div>
                         );
                     })}
+
+                    {/* 拖拽中的跟随悬浮卡片 (Portal Ghost) */}
+                    {draggingId && dragPos && touchStateRef.current && (() => {
+                        const draggedProfile = profiles.find(p => p.id === draggingId);
+                        if (!draggedProfile) return null;
+                        const isActive = draggedProfile.id === activeProfileId;
+                        return (
+                            <div
+                                id="image-drag-ghost"
+                                className="ui-config-card pointer-events-none fixed z-[9999] shadow-2xl ring-2 ring-black bg-[var(--c-card-bg,white)] scale-105"
+                                style={{
+                                    left: `${dragPos.x}px`,
+                                    top: `${dragPos.y}px`,
+                                    width: `${touchStateRef.current.width}px`,
+                                    height: `${touchStateRef.current.height}px`,
+                                    padding: "12px",
+                                    justifyContent: "space-between",
+                                    borderRadius: "16px",
+                                    margin: 0,
+                                }}
+                            >
+                                <div className="min-w-0 flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="truncate text-[calc(14.4px*var(--app-text-scale,1))] font-bold leading-tight text-[var(--c-text-title)]">
+                                            {draggedProfile.name || "未命名方案"}
+                                        </span>
+                                        {isActive && (
+                                            <span className="shrink-0 rounded-full bg-black px-1.5 py-0.5 text-[10px] font-medium text-white">
+                                                使用中
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="menu-desc truncate">{draggedProfile.model || "未设置模型"}</span>
+                                </div>
+                                <div className="flex gap-2 shrink-0 items-center justify-end opacity-60">
+                                    <FileEdit size={18} />
+                                    {profiles.length > 1 && <Trash2 size={18} />}
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
 
