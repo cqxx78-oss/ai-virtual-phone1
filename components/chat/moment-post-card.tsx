@@ -241,10 +241,8 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
         : null;
     const canRetryPhoto = Boolean(fallbackPhotoDescription);
     const canRegeneratePhoto = Boolean(resolvedPhotoUrl)
-        && Boolean(post.photoUrl)
         && Boolean(post.photoDescription?.trim())
-        && post.photoGenerationStatus !== "pending"
-        && (post.photoGenerationStatus === "generated" || Boolean(post.photoGenerationPrompt));
+        && post.photoGenerationStatus !== "pending";
     const openPhotoPromptEditor = useCallback(() => {
         setPhotoPromptDraft(post.photoDescription?.trim() || "");
         setPhotoRetryError("");
