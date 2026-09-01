@@ -48,6 +48,7 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     // 后台生图失败：弹一次弹窗提示，关掉即消失（同时多条失败只提示第一条）
     const [photoFailureNotice, setPhotoFailureNotice] = useState<string | null>(null);
     const [coverUrl, setCoverUrl] = useState<string | null>(null);
+    const [coverLoaded, setCoverLoaded] = useState(false);
     const coverInputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const userIdentity = resolveUserIdentity(undefined, "chat");
@@ -476,7 +477,8 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
                             <img
                                 src={coverUrl}
                                 alt=""
-                                className="feed-cover-image w-full h-full object-cover"
+                                onLoad={() => setCoverLoaded(true)}
+                                className={`feed-cover-image w-full h-full object-cover transition-opacity duration-300 ease-out ${coverLoaded ? "opacity-100" : "opacity-0"}`}
                             />
                         )}
                     </div>

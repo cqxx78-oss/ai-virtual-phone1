@@ -5236,16 +5236,15 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
         }
     }
 
-    const chatRoomBackgroundStyle = bgImageResolved ? {
-        backgroundColor: "#fff",
-        backgroundImage: `url(${bgImageResolved})`,
-        backgroundPosition: "center",
-        backgroundSize: "cover",
-        backgroundRepeat: "no-repeat",
-    } : undefined;
-
     return (
-        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
+        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20 overflow-hidden relative`} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
+            {/* 聊天室背景图层：淡入渲染，避免硬编码白底和突兀闪烁 */}
+            {bgImageResolved && (
+                <div
+                    className="absolute inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out"
+                    style={{ backgroundImage: `url(${bgImageResolved})` }}
+                />
+            )}
             {/* Custom CSS Injection for this session — scoped to prevent leaking */}
             {liveCSS && (
                 <SessionCustomCSS css={liveCSS} scope={`.session-${session.id}`} />
