@@ -1617,7 +1617,9 @@
 }
 
 .prompt-viewer-float-button.quick-action-float-button {
-  bottom: 236px;
+  top: 52%;
+  bottom: auto;
+  right: -24px;
   background:
     radial-gradient(circle at 42% 36%, rgba(126, 232, 205, 0.78) 0%, rgba(123, 196, 255, 0.52) 36%, rgba(167, 144, 255, 0.2) 60%, transparent 76%);
   box-shadow:

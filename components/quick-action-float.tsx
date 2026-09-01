@@ -62,7 +62,7 @@ export function QuickActionFloat() {
     const [floatingPosition, setFloatingPosition] = useState<FloatingPosition | null>(null);
     const [popoverPosition, setPopoverPosition] = useState<PopoverPosition | null>(null);
     const [draggingFloatingButton, setDraggingFloatingButton] = useState(false);
-    const [dockSide, setDockSide] = useState<DockSide>(null);
+    const [dockSide, setDockSide] = useState<DockSide>("right");
     const layerRef = useRef<HTMLDivElement | null>(null);
     const floatingButtonRef = useRef<HTMLButtonElement | null>(null);
     const floatingDragRef = useRef<FloatingDragState | null>(null);
