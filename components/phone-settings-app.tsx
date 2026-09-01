@@ -31,11 +31,8 @@ import { loadChatAppSettings, saveChatAppSettings } from "@/lib/chat-storage";
 import { loadKeepAlive, saveKeepAlive } from "@/lib/weixin-storage";
 import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
 
-export const SettingsContext = createContext<{
-    setSubpageTitle: (title: string | null) => void;
-    setOverrideBack: (action: (() => void) | null) => void;
-    setSubpageRightAction: (page: string, action: ReactNode | null) => void;
-}>({ setSubpageTitle: () => { }, setOverrideBack: () => { }, setSubpageRightAction: () => { } });
+import { SettingsContext } from "./settings/settings-context";
+export { SettingsContext };
 
 type SettingsPageProps = {
     onClose: () => void;

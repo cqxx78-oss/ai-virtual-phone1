@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useContext, type CSSProperties } from "react";
 import { AlertCircle, Camera, Check, ChevronDown, FileEdit, Image as ImageIcon, Plus, RefreshCw, Sparkles, Trash2, Upload, X } from "lucide-react";
-import { SettingsContext } from "../phone-settings-app";
+import { SettingsContext } from "./settings-context";
 import type { ImageGenerationProfile, ImageGenerationSettings as ImageGenerationSettingsType } from "@/lib/settings-types";
 import {
     DEFAULT_IMAGE_GENERATION_SETTINGS,

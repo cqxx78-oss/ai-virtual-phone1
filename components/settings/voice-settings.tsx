@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useContext } from "react";
 import { Plus, Play, Pause, AlertCircle, RefreshCw, FileEdit, Trash2, X, Check, Upload, List, Star } from "lucide-react";
-import { SettingsContext } from "../phone-settings-app";
+import { SettingsContext } from "./settings-context";
 import type { VoiceApiConfig } from "@/lib/settings-types";
 import { loadVoiceConfigs, saveVoiceConfigs } from "@/lib/settings-storage";
 import { synthesizeSpeech } from "@/lib/tts-service";

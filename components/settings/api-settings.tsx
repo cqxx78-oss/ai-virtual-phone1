@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
 import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check } from "lucide-react";
-import { SettingsContext } from "../phone-settings-app";
+import { SettingsContext } from "./settings-context";
 import type { ApiConfig } from "@/lib/settings-types";
 import { loadApiConfigs, removeApiConfigReferences, saveApiConfigs } from "@/lib/settings-storage";
 import { generateEmbedding, isEmbeddingModelName } from "@/lib/memory-embedding";
