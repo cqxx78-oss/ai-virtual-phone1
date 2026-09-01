@@ -238,7 +238,7 @@ export function QuickActionFloat() {
         event.stopPropagation();
         const deltaX = event.clientX - drag.startClientX;
         const deltaY = event.clientY - drag.startClientY;
-        if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) drag.moved = true;
+        if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) drag.moved = true;
         setFloatingPosition({
             left: clampFloatingPosition(drag.left + deltaX, drag.maxLeft),
             top: clampFloatingPosition(drag.top + deltaY, drag.maxTop),
@@ -272,16 +272,6 @@ export function QuickActionFloat() {
             suppressFloatingClickRef.current = false;
             return;
         }
-        // 贴边态 → 第1次点击：展开为完整悬浮球
-        if (dockSide !== null) {
-            setDockSide(null);
-            if (floatingPosition) {
-                const adjust = dockSide === "left" ? 0 : floatingPosition.left - (64 - DOCK_BUTTON_WIDTH);
-                setFloatingPosition({ left: Math.max(12, adjust), top: floatingPosition.top });
-            }
-            return;
-        }
-        // 完整悬浮球 → 第2次点击：打开面板
         reloadData();
         setOpen(prev => !prev);
     }
