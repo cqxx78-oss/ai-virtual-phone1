@@ -572,8 +572,9 @@ export function VoiceSettings() {
         }
     };
 
-    const togglePreview = async (config: VoiceApiConfig) => {
-        if (playingVoiceId === config.id) {
+    const togglePreview = async (config: VoiceApiConfig, specificVoiceId?: string) => {
+        const playKey = specificVoiceId ? `${config.id}:${specificVoiceId}` : config.id;
+        if (playingVoiceId === playKey) {
             if (audioRef.current) {
                 audioRef.current.pause();
                 audioRef.current = null;
@@ -587,15 +588,26 @@ export function VoiceSettings() {
             audioRef.current = null;
         }
 
-        setPlayingVoiceId(config.id);
+        setPlayingVoiceId(playKey);
 
         try {
-            const previewText = config.provider === "Minimax" && config.languageBoost
-                ? MINIMAX_PREVIEW_TEXT[config.languageBoost] || "你好，很高兴认识你。这是一段语音试听。"
-                : "你好，我现在是" + (config.defaultVoice || "默认") + "音色。很高兴认识你。";
+            const activeVoice = specificVoiceId || config.defaultVoice || "";
+            let previewText = config.languageBoost && MINIMAX_PREVIEW_TEXT[config.languageBoost]
+                ? MINIMAX_PREVIEW_TEXT[config.languageBoost]
+                : "你好，很高兴认识你。这是一段语音试听。";
+
+            if (activeVoice.startsWith("Cantonese_") || activeVoice.includes("粤语")) {
+                previewText = MINIMAX_PREVIEW_TEXT["Chinese,Yue"];
+            } else if (activeVoice.startsWith("Japanese_") || activeVoice.includes("日语")) {
+                previewText = MINIMAX_PREVIEW_TEXT["Japanese"];
+            } else if (activeVoice.startsWith("English_") || activeVoice.includes("英语")) {
+                previewText = MINIMAX_PREVIEW_TEXT["English"];
+            }
+
+            const testConfig: VoiceApiConfig = specificVoiceId ? { ...config, defaultVoice: specificVoiceId } : config;
             const blob = await synthesizeSpeech(
                 previewText,
-                config,
+                testConfig,
             );
             if (!blob) throw new Error("当前语音配置未返回真实音频");
             const url = URL.createObjectURL(blob);
@@ -1079,6 +1091,7 @@ export function VoiceSettings() {
                 const renderVoiceItem = (v: VoiceOption) => {
                     const isFav = favoriteVoices.includes(v.id);
                     const isSelected = targetConfig.defaultVoice === v.id;
+                    const isThisPlaying = playingVoiceId === `${targetConfig.id}:${v.id}`;
                     return (
                         <div
                             key={v.id}
@@ -1090,24 +1103,35 @@ export function VoiceSettings() {
                                 isSelected ? "bg-black/10 dark:bg-white/10 font-semibold" : "hover:bg-black/5 dark:hover:bg-white/5"
                             }`}
                         >
-                            <div className="flex flex-col min-w-0 pr-2">
+                            <div className="flex flex-col min-w-0 pr-2 flex-1">
                                 <span className="text-xs md:text-sm truncate">{v.name}</span>
                                 <span className="text-[10px] text-gray-400 truncate">{v.id}</span>
                             </div>
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleFavoriteVoice(v.id);
-                                }}
-                                className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-amber-500 transition-colors"
-                                title={isFav ? "取消收藏" : "收藏音色"}
-                            >
-                                <Star
-                                    size={16}
-                                    className={isFav ? "fill-amber-400 text-amber-500" : "text-gray-400"}
-                                />
-                            </button>
+                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                    type="button"
+                                    onClick={() => togglePreview(targetConfig, v.id)}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                        isThisPlaying
+                                            ? "bg-black/10 dark:bg-white/10 text-blue-500"
+                                            : "hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                    }`}
+                                    title={isThisPlaying ? "停止试听" : "试听音色"}
+                                >
+                                    {isThisPlaying ? <Pause size={16} /> : <Play size={16} />}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleFavoriteVoice(v.id)}
+                                    className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-gray-400 hover:text-amber-500 transition-colors"
+                                    title={isFav ? "取消收藏" : "收藏音色"}
+                                >
+                                    <Star
+                                        size={16}
+                                        className={isFav ? "fill-amber-400 text-amber-500" : "text-gray-400"}
+                                    />
+                                </button>
+                            </div>
                         </div>
                     );
                 };
@@ -1115,7 +1139,7 @@ export function VoiceSettings() {
                 return (
                     <div className="modal-overlay z-50" onClick={() => setVoicePickerTargetId(null)}>
                         <div
-                            className="modal-expand flex flex-col" style={{ width: "min(480px, calc(100% - 24px))", maxHeight: "85%", height: "auto" }}
+                            className="modal-expand flex flex-col" style={{ width: "min(480px, calc(100% - 24px))", height: "min(540px, 80vh)" }}
                             data-ui="modal-dialog"
                             onClick={(e) => e.stopPropagation()}
                         >
