@@ -206,7 +206,7 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                                     <span className="ts-11 text-[var(--c-text)] max-w-full truncate">{sticker.name}</span>
                                 )}
                             </div>
-                            <span className="ts-10 leading-tight text-[var(--c-text)] opacity-75 w-full text-center truncate min-h-[14px]">
+                            <span className="ts-11 leading-normal text-[var(--c-text)] opacity-80 w-full text-center truncate min-h-[18px]">
                                 {showName ? sticker.name : ""}
                             </span>
                         </button>
