@@ -5238,13 +5238,16 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
 
     return (
         <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20 overflow-hidden relative`} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
-            {/* 聊天室背景图层：淡入渲染，避免硬编码白底和突兀闪烁 */}
-            {bgImageResolved && (
+            {/* 聊天室背景图层：淡入渲染，加载中显示骨架色 */}
+            {bgImageResolved ? (
                 <div
                     className="absolute inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out"
                     style={{ backgroundImage: `url(${bgImageResolved})` }}
                 />
-            )}
+            ) : currentBgImage ? (
+                // 有背景图配置但还没加载完：显示骨架色占位
+                <div className="absolute inset-0 pointer-events-none -z-10 bg-[var(--c-input)]" />
+            ) : null}
             {/* Custom CSS Injection for this session — scoped to prevent leaking */}
             {liveCSS && (
                 <SessionCustomCSS css={liveCSS} scope={`.session-${session.id}`} />

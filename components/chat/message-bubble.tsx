@@ -1813,13 +1813,20 @@ export function MediaImageWithPreview({
     regenerating?: boolean;
 }) {
     const [preview, setPreview] = useState(false);
+    const [imgLoaded, setImgLoaded] = useState(false);
     const saveName = filename || title;
     return (
         <>
             <div className="chat-media-file-wrap">
                 <div className="chat-media-file-card chat-media-file-image" onClick={(e) => { e.stopPropagation(); setPreview(true); }}>
                     {title && <div className="chat-media-file-title">{title}</div>}
-                    <img src={url} alt={title} style={{ cursor: "pointer" }} onError={onError} />
+                    <img
+                        src={url}
+                        alt={title}
+                        style={{ cursor: "pointer", opacity: imgLoaded ? 1 : 0, transition: "opacity 0.2s ease-out" }}
+                        onLoad={() => setImgLoaded(true)}
+                        onError={onError}
+                    />
                 </div>
             </div>
             {preview && (
