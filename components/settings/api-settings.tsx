@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
-import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check } from "lucide-react";
+import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check, Settings2, ArrowUp, ArrowDown, Edit3 } from "lucide-react";
 import { SettingsContext } from "./settings-context";
 import type { ApiConfig } from "@/lib/settings-types";
 import { loadApiConfigs, removeApiConfigReferences, saveApiConfigs } from "@/lib/settings-storage";
@@ -46,6 +46,18 @@ export function ApiSettings() {
     const [isTesting, setIsTesting] = useState<Record<string, boolean>>({});
     const [testResult, setTestResult] = useState<Record<string, { success: boolean; message: string }>>({});
     const [selectedGroup, setSelectedGroup] = useState<string>("全部");
+    const [isManagingGroups, setIsManagingGroups] = useState(false);
+    const [customGroupOrder, setCustomGroupOrder] = useState<string[]>(() => {
+        if (typeof window === "undefined") return [];
+        try {
+            const saved = localStorage.getItem("ai_phone_api_group_order_v1");
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [editingGroupName, setEditingGroupName] = useState<string | null>(null);
+    const [newGroupNameInput, setNewGroupNameInput] = useState("");
 
     // Load from localStorage on mount
     useEffect(() => {
@@ -327,25 +339,81 @@ export function ApiSettings() {
     };
 
 
-    // 分组提取与过滤
-    const allGroups = useMemo(() => {
-        const groups = new Set<string>();
-        (configs || []).forEach(c => {
-            const g = (c?.group || "").trim();
-            if (g) groups.add(g);
-            else groups.add("默认");
-        });
-        return ["全部", ...Array.from(groups)];
-    }, [configs]);
-
+    // 分组提取与过滤（支持自定义排序与多行展示）
     const existingGroups = useMemo(() => {
         const set = new Set<string>();
         (configs || []).forEach(c => {
             const g = (c?.group || "").trim();
             if (g) set.add(g);
         });
-        return Array.from(set);
-    }, [configs]);
+        const list = Array.from(set);
+        // 根据 customGroupOrder 排序
+        return list.sort((a, b) => {
+            const idxA = customGroupOrder.indexOf(a);
+            const idxB = customGroupOrder.indexOf(b);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return a.localeCompare(b);
+        });
+    }, [configs, customGroupOrder]);
+
+    const allGroups = useMemo(() => {
+        const hasDefault = (configs || []).some(c => !(c?.group || "").trim());
+        const groups = ["全部"];
+        if (hasDefault || configs.length === 0) groups.push("默认");
+        groups.push(...existingGroups);
+        return groups;
+    }, [configs, existingGroups]);
+
+    // 分组管理逻辑：改名、重排、删除（清空该组）
+    const handleRenameGroup = (oldName: string, newName: string) => {
+        const trimmed = newName.trim();
+        if (!trimmed || trimmed === oldName) {
+            setEditingGroupName(null);
+            return;
+        }
+        const updated = configs.map(c => {
+            const g = (c.group || "").trim();
+            if (g === oldName) {
+                return { ...c, group: trimmed };
+            }
+            return c;
+        });
+        persist(updated);
+        // 同步更新排序列表
+        const newOrder = customGroupOrder.map(item => item === oldName ? trimmed : item);
+        setCustomGroupOrder(newOrder);
+        try { localStorage.setItem("ai_phone_api_group_order_v1", JSON.stringify(newOrder)); } catch {}
+        if (selectedGroup === oldName) setSelectedGroup(trimmed);
+        setEditingGroupName(null);
+    };
+
+    const handleDeleteGroup = (groupName: string) => {
+        // 将属于该分组的全部设为默认（清空 group 字段）
+        const updated = configs.map(c => {
+            const g = (c.group || "").trim();
+            if (g === groupName) {
+                return { ...c, group: "" };
+            }
+            return c;
+        });
+        persist(updated);
+        const newOrder = customGroupOrder.filter(item => item !== groupName);
+        setCustomGroupOrder(newOrder);
+        try { localStorage.setItem("ai_phone_api_group_order_v1", JSON.stringify(newOrder)); } catch {}
+        if (selectedGroup === groupName) setSelectedGroup("全部");
+    };
+
+    const handleMoveGroup = (index: number, direction: "up" | "down") => {
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= existingGroups.length) return;
+        const newGroups = [...existingGroups];
+        const [removed] = newGroups.splice(index, 1);
+        newGroups.splice(targetIndex, 0, removed);
+        setCustomGroupOrder(newGroups);
+        try { localStorage.setItem("ai_phone_api_group_order_v1", JSON.stringify(newGroups)); } catch {}
+    };
 
     const displayedConfigs = useMemo(() => {
         if (!Array.isArray(configs)) return [];
@@ -492,13 +560,13 @@ export function ApiSettings() {
             ) : (
                 <div className="flex flex-col gap-3">
                     {allGroups && allGroups.length > 2 && (
-                        <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+                        <div className="flex flex-wrap items-center gap-1.5 pb-1">
                             {allGroups.map((grp) => (
                                 <button
                                     key={grp}
                                     type="button"
                                     onClick={() => setSelectedGroup(grp)}
-                                    className={`px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${
+                                    className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
                                         selectedGroup === grp
                                             ? "bg-black text-white shadow-sm"
                                             : "bg-black/5 text-black/60 hover:bg-black/10"
@@ -507,6 +575,17 @@ export function ApiSettings() {
                                     {grp}
                                 </button>
                             ))}
+                            {existingGroups.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsManagingGroups(true)}
+                                    className="px-2.5 py-1 text-xs font-semibold rounded-full bg-black/5 text-black/60 hover:bg-black/10 transition-colors inline-flex items-center gap-1 ml-auto"
+                                    title="管理分组"
+                                >
+                                    <Settings2 size={13} />
+                                    <span>管理</span>
+                                </button>
+                            )}
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-3 relative">
@@ -834,6 +913,128 @@ export function ApiSettings() {
                                     </>
                                 )
                             })()}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 分组管理弹窗 */}
+            {isManagingGroups && (
+                <div className="modal-overlay modal-overlay-bottom">
+                    <div className="modal-sheet max-h-[80vh]" data-ui="modal-sheet">
+                        <div className="modal-header" data-ui="modal-header">
+                            <span className="modal-header-title">管理 API 分组</span>
+                            <button onClick={() => setIsManagingGroups(false)} className="modal-header-btn modal-header-btn-action">
+                                <Check size={18} />
+                            </button>
+                        </div>
+
+                        <div className="modal-body hide-scrollbar flex flex-col gap-3 pb-8" data-ui="modal-body">
+                            <span className="text-xs text-[var(--c-subtext,#888)]">
+                                可以给自定义分组重命名、调整展示顺序，或删除分组（删除后组内 API 会归入默认分组，不会删除 API 本身）。
+                            </span>
+
+                            {existingGroups.length === 0 ? (
+                                <div className="ui-empty py-6 text-xs text-gray-500">暂无自定义分组</div>
+                            ) : (
+                                <div className="flex flex-col gap-2 mt-1">
+                                    {existingGroups.map((groupName, idx) => {
+                                        const count = configs.filter(c => (c.group || "").trim() === groupName).length;
+                                        const isEditing = editingGroupName === groupName;
+                                        return (
+                                            <div
+                                                key={groupName}
+                                                className="flex items-center justify-between p-2.5 rounded-xl bg-black/[0.03] border border-black/5 gap-2"
+                                            >
+                                                {isEditing ? (
+                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                        <input
+                                                            type="text"
+                                                            value={newGroupNameInput}
+                                                            onChange={(e) => setNewGroupNameInput(e.target.value)}
+                                                            className="ui-input flex-1 !text-xs !py-1 !px-2"
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") handleRenameGroup(groupName, newGroupNameInput);
+                                                                if (e.key === "Escape") setEditingGroupName(null);
+                                                            }}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRenameGroup(groupName, newGroupNameInput)}
+                                                            className="p-1.5 rounded-lg bg-black text-white hover:bg-gray-800"
+                                                        >
+                                                            <Check size={14} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingGroupName(null)}
+                                                            className="p-1.5 rounded-lg bg-black/5 hover:bg-black/10 text-black/60"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                        <span className="text-xs font-bold text-[var(--c-text-title)] truncate">
+                                                            {groupName}
+                                                        </span>
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/5 text-black/60 shrink-0">
+                                                            {count} 个配置
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {!isEditing && (
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        {/* 上移 */}
+                                                        <button
+                                                            type="button"
+                                                            disabled={idx === 0}
+                                                            onClick={() => handleMoveGroup(idx, "up")}
+                                                            className="p-1.5 rounded-lg text-black/60 hover:bg-black/5 disabled:opacity-20 transition-colors"
+                                                            title="上移"
+                                                        >
+                                                            <ArrowUp size={14} />
+                                                        </button>
+                                                        {/* 下移 */}
+                                                        <button
+                                                            type="button"
+                                                            disabled={idx === existingGroups.length - 1}
+                                                            onClick={() => handleMoveGroup(idx, "down")}
+                                                            className="p-1.5 rounded-lg text-black/60 hover:bg-black/5 disabled:opacity-20 transition-colors"
+                                                            title="下移"
+                                                        >
+                                                            <ArrowDown size={14} />
+                                                        </button>
+                                                        {/* 重命名 */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingGroupName(groupName);
+                                                                setNewGroupNameInput(groupName);
+                                                            }}
+                                                            className="p-1.5 rounded-lg text-black/60 hover:bg-black/5 transition-colors"
+                                                            title="重命名"
+                                                        >
+                                                            <Edit3 size={14} />
+                                                        </button>
+                                                        {/* 删除 */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteGroup(groupName)}
+                                                            className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                                                            title="删除分组"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
