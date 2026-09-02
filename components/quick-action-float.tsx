@@ -447,8 +447,13 @@ export function QuickActionFloat() {
                                             disabled={characterDisabled}
                                             onClick={() => updateApiConfig(api.id)}
                                         >
-                                            <span>{api.name || api.defaultModel || api.provider}</span>
-                                            {currentSlot.apiConfigId === api.id ? <Check size={15} /> : null}
+                                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                <span className="truncate font-medium">{api.name || api.defaultModel || api.provider}</span>
+                                                {api.defaultModel && api.name && (
+                                                    <span className="text-[11px] opacity-50 font-normal truncate ml-auto">{api.defaultModel}</span>
+                                                )}
+                                            </div>
+                                            {currentSlot.apiConfigId === api.id ? <Check size={15} className="shrink-0 ml-1.5" /> : null}
                                         </button>
                                     ))
                                 ) : (
@@ -486,8 +491,13 @@ export function QuickActionFloat() {
                                                                     disabled={characterDisabled}
                                                                     onClick={() => updateApiConfig(api.id)}
                                                                 >
-                                                                    <span>{api.name || api.defaultModel || api.provider}</span>
-                                                                    {currentSlot.apiConfigId === api.id ? <Check size={14} /> : null}
+                                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                                        <span className="truncate font-medium">{api.name || api.defaultModel || api.provider}</span>
+                                                                        {api.defaultModel && api.name && (
+                                                                            <span className="text-[10px] opacity-50 font-normal truncate ml-auto">{api.defaultModel}</span>
+                                                                        )}
+                                                                    </div>
+                                                                    {currentSlot.apiConfigId === api.id ? <Check size={14} className="shrink-0 ml-1" /> : null}
                                                                 </button>
                                                             ))}
                                                         </div>
