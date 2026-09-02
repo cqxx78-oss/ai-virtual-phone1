@@ -183,7 +183,7 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                     ))}
                 </div>
             )}
-            <div className="flex-1 overflow-auto px-2 py-1 grid grid-cols-5 gap-x-1 gap-y-2 content-start hide-scrollbar">
+            <div className="flex-1 overflow-auto px-1.5 py-1 grid grid-cols-5 gap-x-0.5 gap-y-1 content-start hide-scrollbar">
                 {!activePack && (
                     <div className="col-span-5 flex items-center justify-center text-[var(--c-text-muted)] ts-12 py-8">
                         暂无表情包，请在角色设置里上传或绑定。
