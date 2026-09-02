@@ -63,6 +63,7 @@ export function QuickActionFloat() {
     const [popoverPosition, setPopoverPosition] = useState<PopoverPosition | null>(null);
     const [draggingFloatingButton, setDraggingFloatingButton] = useState(false);
     const [dockSide, setDockSide] = useState<DockSide>("right");
+    const [expandedApiGroups, setExpandedApiGroups] = useState<Record<string, boolean>>({});
     const layerRef = useRef<HTMLDivElement | null>(null);
     const floatingButtonRef = useRef<HTMLButtonElement | null>(null);
     const floatingDragRef = useRef<FloatingDragState | null>(null);
@@ -158,6 +159,36 @@ export function QuickActionFloat() {
     const inheritedWorldBookNames = scope === "character"
         ? (config.globalDefaults.worldBookIds || []).map(id => itemName(worldBooks, id)).filter(Boolean)
         : [];
+
+    // 按分组组织 API 配置
+    const groupedApiConfigs = useMemo(() => {
+        const groups: { name: string; items: ApiConfig[] }[] = [];
+        const map = new Map<string, ApiConfig[]>();
+        
+        apiConfigs.forEach(api => {
+            const groupName = (api.group || "").trim() || "默认";
+            if (!map.has(groupName)) {
+                map.set(groupName, []);
+            }
+            map.get(groupName)!.push(api);
+        });
+
+        map.forEach((items, name) => {
+            groups.push({ name, items });
+        });
+
+        // 若只有一个分组且为「默认」，则无需分组外壳
+        return groups;
+    }, [apiConfigs]);
+
+    const hasMultipleGroups = groupedApiConfigs.length > 1 || (groupedApiConfigs.length === 1 && groupedApiConfigs[0].name !== "默认");
+
+    const toggleApiGroup = useCallback((groupName: string) => {
+        setExpandedApiGroups(prev => ({
+            ...prev,
+            [groupName]: prev[groupName] === undefined ? false : !prev[groupName]
+        }));
+    }, []);
 
     const persistConfig = useCallback((next: BindingConfig) => {
         setConfig(next);
@@ -404,19 +435,66 @@ export function QuickActionFloat() {
                                 </button>
                                 {apiConfigs.length === 0 ? (
                                     <div className="quick-action-empty">暂无 API 配置</div>
-                                ) : apiConfigs.map(api => (
-                                    <button
-                                        type="button"
-                                        key={api.id}
-                                        className="quick-action-option"
-                                        data-selected={currentSlot.apiConfigId === api.id}
-                                        disabled={characterDisabled}
-                                        onClick={() => updateApiConfig(api.id)}
-                                    >
-                                        <span>{api.name || api.defaultModel || api.provider}</span>
-                                        {currentSlot.apiConfigId === api.id ? <Check size={15} /> : null}
-                                    </button>
-                                ))}
+                                ) : !hasMultipleGroups ? (
+                                    apiConfigs.map(api => (
+                                        <button
+                                            type="button"
+                                            key={api.id}
+                                            className="quick-action-option"
+                                            data-selected={currentSlot.apiConfigId === api.id}
+                                            disabled={characterDisabled}
+                                            onClick={() => updateApiConfig(api.id)}
+                                        >
+                                            <span>{api.name || api.defaultModel || api.provider}</span>
+                                            {currentSlot.apiConfigId === api.id ? <Check size={15} /> : null}
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="flex flex-col gap-2 mt-1">
+                                        {groupedApiConfigs.map(group => {
+                                            // 默认展开：如果当前选中的配置在该组内则展开，或者没有显式折叠过
+                                            const isCurrentInGroup = group.items.some(i => i.id === currentSlot.apiConfigId);
+                                            const isExpanded = expandedApiGroups[group.name] ?? (isCurrentInGroup || true);
+                                            return (
+                                                <div key={group.name} className="flex flex-col rounded-xl overflow-hidden bg-black/[0.03] border border-black/5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleApiGroup(group.name)}
+                                                        className="flex items-center justify-between px-3 py-2 text-xs font-bold text-[var(--c-text-title)] hover:bg-black/5 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="truncate max-w-[170px]">{group.name}</span>
+                                                            <span className="text-[10px] font-normal px-1.5 py-0.2 rounded-full bg-black/5 text-black/60">
+                                                                {group.items.length}
+                                                            </span>
+                                                        </div>
+                                                        <ChevronDown
+                                                            size={14}
+                                                            className={`transition-transform duration-200 text-black/40 ${isExpanded ? "rotate-180" : "rotate-0"}`}
+                                                        />
+                                                    </button>
+                                                    {isExpanded && (
+                                                        <div className="flex flex-col gap-1 p-1.5 pt-0.5">
+                                                            {group.items.map(api => (
+                                                                <button
+                                                                    type="button"
+                                                                    key={api.id}
+                                                                    className="quick-action-option !min-h-[38px] !text-xs !bg-white/60 hover:!bg-white/90"
+                                                                    data-selected={currentSlot.apiConfigId === api.id}
+                                                                    disabled={characterDisabled}
+                                                                    onClick={() => updateApiConfig(api.id)}
+                                                                >
+                                                                    <span>{api.name || api.defaultModel || api.provider}</span>
+                                                                    {currentSlot.apiConfigId === api.id ? <Check size={14} /> : null}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         </section>
 
