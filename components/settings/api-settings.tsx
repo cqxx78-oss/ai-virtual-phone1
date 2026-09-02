@@ -98,6 +98,22 @@ export function ApiSettings() {
         persist(configs.map(c => c.id === id ? { ...c, ...updates } : c));
     };
 
+    const removeConfig = useCallback((id: string) => {
+        persist(configs.filter(c => c.id !== id));
+        removeApiConfigReferences(id);
+        const newFetchedModels = { ...fetchedModels };
+        delete newFetchedModels[id];
+        setFetchedModels(newFetchedModels);
+
+        const newModelQuery = { ...modelQuery };
+        delete newModelQuery[id];
+        setModelQuery(newModelQuery);
+
+        const newTestResults = { ...testResult };
+        delete newTestResults[id];
+        setTestResult(newTestResults);
+    }, [configs, fetchedModels, modelQuery, persist, testResult]);
+
     // 弹窗打开时拦截全局返回键，优先关闭弹窗
     useEffect(() => {
         if (editingId) {
@@ -310,21 +326,6 @@ export function ApiSettings() {
         startDrag(id, e.clientX, e.clientY);
     };
 
-    const removeConfig = (id: string) => {
-        persist(configs.filter(c => c.id !== id));
-        removeApiConfigReferences(id);
-        const newFetchedModels = { ...fetchedModels };
-        delete newFetchedModels[id];
-        setFetchedModels(newFetchedModels);
-
-        const newModelQuery = { ...modelQuery };
-        delete newModelQuery[id];
-        setModelQuery(newModelQuery);
-
-        const newTestResults = { ...testResult };
-        delete newTestResults[id];
-        setTestResult(newTestResults);
-    };
 
     // 分组提取与过滤
     const allGroups = useMemo(() => {
