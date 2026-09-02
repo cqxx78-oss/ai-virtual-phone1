@@ -1142,6 +1142,7 @@ function DiaryEntryFontPanel({
             {customFonts.length > 0 && (
               <div style={{ marginTop: "12px" }}>
                 <div style={{ fontSize: "12px", fontWeight: 600, color: "rgba(48,45,40,0.7)", marginBottom: "6px" }}>已上传字体：</div>
+                <div className="diary-font-custom-list">
                 {customFonts.map(font => {
                   const family = `"AIPhoneDiaryFont_${font.id}", "NoteWall Ximai", var(--app-font-family)`;
                   return (
@@ -1169,6 +1170,7 @@ function DiaryEntryFontPanel({
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
 

@@ -538,6 +538,15 @@
   max-width: 130px;
 }
 
+.diary-font-custom-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .diary-font-custom-item {
   display: flex;
   align-items: center;
@@ -547,7 +556,6 @@
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.6);
   box-shadow: inset 0 0 0 1px rgba(80, 66, 48, 0.08);
-  margin-bottom: 6px;
 }
 
 .diary-font-custom-meta {
