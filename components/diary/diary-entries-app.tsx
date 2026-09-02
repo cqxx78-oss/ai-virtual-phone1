@@ -1121,7 +1121,10 @@ function DiaryEntryFontPanel({
                   </div>
                   <div
                     className="diary-font-sample-preview"
-                    style={{ fontFamily: fontFamilyById.get(characterFontMap[character.id] || "ximai") || 'var(--app-font-family)' }}
+                    style={{
+                      fontFamily: fontFamilyById.get(characterFontMap[character.id] || "ximai") || 'var(--app-font-family)',
+                      fontSize: `calc(18px * var(--app-text-scale, 1) * ${scale})`,
+                    }}
                   >
                     见字如面 · 今日晴朗，记录下留存的瞬间。
                   </div>
@@ -1145,7 +1148,13 @@ function DiaryEntryFontPanel({
                     <div key={font.id} className="diary-font-custom-item">
                       <div className="diary-font-custom-meta">
                         <strong className="diary-font-custom-title">{font.name}</strong>
-                        <span className="diary-font-custom-sample" style={{ fontFamily: family }}>
+                        <span
+                          className="diary-font-custom-sample"
+                          style={{
+                            fontFamily: family,
+                            fontSize: `calc(18px * var(--app-text-scale, 1) * ${scale})`,
+                          }}
+                        >
                           见字如面 Aa 123
                         </span>
                       </div>
