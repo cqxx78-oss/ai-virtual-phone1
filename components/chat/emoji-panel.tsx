@@ -197,16 +197,16 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                             key={`${activePack.id}:${sticker.id}`}
                             onClick={() => onSend(sticker.name, url)}
                             title={sticker.name}
-                            className="border-none bg-transparent cursor-pointer p-0.5 rounded-lg flex flex-col items-center justify-start gap-1 min-w-0 overflow-hidden"
+                            className="border-none bg-transparent cursor-pointer p-0.5 rounded-lg flex flex-col items-center justify-start gap-0.5 min-w-0 overflow-hidden"
                         >
-                            <div className="w-14 h-14 flex items-center justify-center shrink-0">
+                            <div className="w-12 h-12 flex items-center justify-center shrink-0">
                                 {url ? (
-                                    <img src={url} alt={sticker.name} className="w-14 h-14 object-contain" />
+                                    <img src={url} alt={sticker.name} className="w-12 h-12 max-h-12 object-contain" />
                                 ) : (
                                     <span className="ts-11 text-[var(--c-text)] max-w-full truncate">{sticker.name}</span>
                                 )}
                             </div>
-                            <span className="ts-11 leading-normal text-[var(--c-text)] opacity-80 w-full text-center truncate min-h-[18px]">
+                            <span className="ts-11 leading-tight text-[var(--c-text)] opacity-80 w-full text-center truncate min-h-[16px] px-0.5">
                                 {showName ? sticker.name : ""}
                             </span>
                         </button>
