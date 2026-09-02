@@ -423,16 +423,18 @@ export function QuickActionFloat() {
                                 {currentSlot.apiConfigId ? <small>{itemName(apiConfigs, currentSlot.apiConfigId)}</small> : <small>{scope === "global" ? "未设置" : "继承"}</small>}
                             </div>
                             <div className="quick-action-option-list">
-                                <button
-                                    type="button"
-                                    className="quick-action-option"
-                                    data-selected={!currentSlot.apiConfigId}
-                                    disabled={characterDisabled}
-                                    onClick={() => updateApiConfig(undefined)}
-                                >
-                                    <span>{inheritApiLabel}</span>
-                                    {!currentSlot.apiConfigId ? <Check size={15} /> : null}
-                                </button>
+                                {scope === "character" && (
+                                    <button
+                                        type="button"
+                                        className="quick-action-option"
+                                        data-selected={!currentSlot.apiConfigId}
+                                        disabled={characterDisabled}
+                                        onClick={() => updateApiConfig(undefined)}
+                                    >
+                                        <span>{inheritApiLabel}</span>
+                                        {!currentSlot.apiConfigId ? <Check size={15} /> : null}
+                                    </button>
+                                )}
                                 {apiConfigs.length === 0 ? (
                                     <div className="quick-action-empty">暂无 API 配置</div>
                                 ) : !hasMultipleGroups ? (
