@@ -1804,6 +1804,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     const initialScrollVersionRef = useRef(0);
     const pendingSearchJumpRef = useRef<PendingMessageJump | null>(null);
     const searchJumpHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const chatTouchStartYRef = useRef<number | null>(null);
 
     const stopLoadMoreAnchorTracking = useCallback(() => {
         loadMoreResizeObserverRef.current?.disconnect();
@@ -5336,6 +5337,10 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 className="page-body chat-room-main-pane flex flex-col gap-4 chat-scroll-anchored"
                 onScroll={(e) => {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
+                    const targetEl = e.currentTarget;
+                    if (!offlineMode && hasMore && targetEl.scrollTop <= 20) {
+                        loadMore();
+                    }
                     if (unreadJumpFirstId) {
                         const el = scrollRef.current;
                         const target = document.getElementById(`message-${unreadJumpFirstId}`);
@@ -5347,6 +5352,26 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                             }
                         }
                     }
+                }}
+                onTouchStart={(e) => {
+                    if (e.touches.length === 1) {
+                        chatTouchStartYRef.current = e.touches[0].clientY;
+                    }
+                }}
+                onTouchMove={(e) => {
+                    if (!offlineMode && hasMore && chatTouchStartYRef.current !== null && e.touches.length === 1) {
+                        const currentY = e.touches[0].clientY;
+                        const deltaY = currentY - chatTouchStartYRef.current;
+                        if (deltaY > 15 && e.currentTarget.scrollTop <= 5) {
+                            loadMore();
+                        }
+                    }
+                }}
+                onTouchEnd={() => {
+                    chatTouchStartYRef.current = null;
+                }}
+                onTouchCancel={() => {
+                    chatTouchStartYRef.current = null;
                 }}
                 onPointerDown={(e) => {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
