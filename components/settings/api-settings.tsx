@@ -338,6 +338,15 @@ export function ApiSettings() {
         return ["全部", ...Array.from(groups)];
     }, [configs]);
 
+    const existingGroups = useMemo(() => {
+        const set = new Set<string>();
+        (configs || []).forEach(c => {
+            const g = (c?.group || "").trim();
+            if (g) set.add(g);
+        });
+        return Array.from(set);
+    }, [configs]);
+
     const displayedConfigs = useMemo(() => {
         if (!Array.isArray(configs)) return [];
         if (selectedGroup === "全部") return configs;
@@ -625,14 +634,52 @@ export function ApiSettings() {
                                                 placeholder="例如: 我的 OpenAI"
                                             />
                                         </div>
-                                        <div className="flex flex-col gap-1">
-                                            <label className="menu-desc ml-1">所属分组 (留空为默认)</label>
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between ml-1">
+                                                <label className="menu-desc">所属分组 (留空为默认)</label>
+                                                {config.group && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateConfig(config.id, { group: "" })}
+                                                        className="text-[11px] text-[var(--c-subtext,#888)] hover:text-red-500 transition-colors"
+                                                    >
+                                                        设为默认
+                                                    </button>
+                                                )}
+                                            </div>
                                             <Input
                                                 type="text"
+                                                list="existing-api-groups"
                                                 value={config.group || ""}
                                                 onChange={(e) => updateConfig(config.id, { group: e.target.value })}
-                                                placeholder="例如: 主力 / 备用 / 翻译 (留空默认)"
+                                                placeholder="输入新分组或选择已有分组 (留空默认)"
                                             />
+                                            <datalist id="existing-api-groups">
+                                                {existingGroups.map(g => (
+                                                    <option key={g} value={g} />
+                                                ))}
+                                            </datalist>
+                                            {existingGroups.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                                                    {existingGroups.map((grp) => {
+                                                        const isSelected = (config.group || "").trim() === grp;
+                                                        return (
+                                                            <button
+                                                                key={grp}
+                                                                type="button"
+                                                                onClick={() => updateConfig(config.id, { group: isSelected ? "" : grp })}
+                                                                className={`px-2.5 py-0.5 text-xs rounded-full border transition-all ${
+                                                                    isSelected
+                                                                        ? "bg-black text-white border-black font-semibold shadow-xs"
+                                                                        : "bg-black/5 text-black/70 border-transparent hover:bg-black/10"
+                                                                }`}
+                                                            >
+                                                                {grp}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex flex-col gap-1">
                                             <label className="menu-desc ml-1">服务商 (Provider)</label>
