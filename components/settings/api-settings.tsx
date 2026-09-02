@@ -46,6 +46,7 @@ export function ApiSettings() {
     const [isTesting, setIsTesting] = useState<Record<string, boolean>>({});
     const [testResult, setTestResult] = useState<Record<string, { success: boolean; message: string }>>({});
     const [selectedGroup, setSelectedGroup] = useState<string>("全部");
+    const [searchQuery, setSearchQuery] = useState<string>("");
     const [isManagingGroups, setIsManagingGroups] = useState(false);
     const [customGroupOrder, setCustomGroupOrder] = useState<string[]>(() => {
         if (typeof window === "undefined") return [];
@@ -417,12 +418,24 @@ export function ApiSettings() {
 
     const displayedConfigs = useMemo(() => {
         if (!Array.isArray(configs)) return [];
-        if (selectedGroup === "全部") return configs;
-        return configs.filter(c => {
-            const g = (c?.group || "").trim() || "默认";
-            return g === selectedGroup;
-        });
-    }, [configs, selectedGroup]);
+        let list = configs;
+        if (selectedGroup !== "全部") {
+            list = list.filter(c => {
+                const g = (c?.group || "").trim() || "默认";
+                return g === selectedGroup;
+            });
+        }
+        const q = searchQuery.trim().toLowerCase();
+        if (q) {
+            list = list.filter(c => {
+                const name = (c?.name || "").toLowerCase();
+                const model = (c?.defaultModel || "").toLowerCase();
+                const provider = (c?.provider || "").toLowerCase();
+                return name.includes(q) || model.includes(q) || provider.includes(q);
+            });
+        }
+        return list;
+    }, [configs, selectedGroup, searchQuery]);
 
     // 模型下拉搜索：按关键词实时过滤已拉取模型（大小写不敏感）
     const filteredModels = useMemo(() => {
@@ -540,8 +553,27 @@ export function ApiSettings() {
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex items-center">
-                <h2 className="m-0 mx-2 ts-28 font-bold italic leading-none text-black">API Settings</h2>
+            <div className="flex items-center justify-between gap-3 px-2">
+                <h2 className="m-0 ts-28 font-bold italic leading-none text-black whitespace-nowrap">API Settings</h2>
+                <div className="relative flex-1 max-w-[180px]">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-black/40 pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="搜索方案/模型..."
+                        className="w-full h-8 pl-8 pr-7 text-xs rounded-full bg-black/5 border border-transparent focus:border-black/20 focus:bg-white text-black placeholder:text-black/40 outline-none transition-all"
+                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery("")}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-black/40 hover:text-black p-0.5"
+                        >
+                            <X size={12} />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {configs.length === 0 ? (
@@ -588,8 +620,13 @@ export function ApiSettings() {
                             )}
                         </div>
                     )}
-                    <div className="grid grid-cols-2 gap-3 relative">
-                    {displayedConfigs.map((config) => {
+                    {displayedConfigs.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-black/40">
+                            未找到相关 API 方案
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-3 relative">
+                        {displayedConfigs.map((config) => {
                         const isDragging = draggingId === config.id;
                         return (
                             <div
@@ -686,6 +723,7 @@ export function ApiSettings() {
                         );
                     })()}
                     </div>
+                    )}
                 </div>
             )}
 
