@@ -19,7 +19,7 @@ import {
     X,
     type LucideIcon,
 } from "lucide-react";
-import { SettingsContext } from "../phone-settings-app";
+import { SettingsContext } from "./settings-context";
 import { ICONS, type IconId } from "@/lib/desktop-config";
 import { IconGlyph } from "@/components/icon-glyph";
 import { CUSTOM_APPS_UPDATED_EVENT, loadInstalledCustomApps } from "@/lib/custom-app-storage";

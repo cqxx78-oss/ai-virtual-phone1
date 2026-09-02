@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, createContext, type CSSProperties, type ReactNode } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, type CSSProperties, type ReactNode } from "react";
 import { pushNav } from "@/lib/navigation-stack";
 import { Activity, Check, ChevronRight, Clock, Database, FileText, Fingerprint, Globe, HardDrive, Image, Info, KeyRound, Laptop, Layers, Link2, Loader2, LogOut, MessageSquare, Mic, SlidersHorizontal, UserCircle, Wrench, X, CloudUpload } from "lucide-react";
 import { ConfirmDialog } from "./ui/modal";
@@ -32,7 +32,6 @@ import { loadKeepAlive, saveKeepAlive } from "@/lib/weixin-storage";
 import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
 
 import { SettingsContext } from "./settings/settings-context";
-export { SettingsContext };
 
 type SettingsPageProps = {
     onClose: () => void;
