@@ -256,7 +256,7 @@ export function QuickActionFloat() {
             const currentLeft = floatingPosition?.left ?? drag.left;
             const midX = drag.maxLeft * DOCK_THRESHOLD;
             const snap: DockSide = currentLeft < midX ? "left" : "right";
-            const snapLeft = snap === "left" ? -24 : drag.maxLeft + 24;
+            const snapLeft = snap === "left" ? -20 : drag.maxLeft + 20;
             setFloatingPosition({ left: snapLeft, top: floatingPosition?.top ?? drag.top });
             setDockSide(snap);
         }
