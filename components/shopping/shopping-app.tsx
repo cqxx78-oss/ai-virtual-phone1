@@ -1179,7 +1179,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
         <div style={{ width: "100%", height: compact ? "92px" : "120px", background: "#f5f5f5", borderRadius: "12px", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: compact ? "30px" : "34px" }}>
           {item.previewIcon}
         </div>
-        <strong style={{ fontSize: "calc(13px*var(--app-text-scale,1))", color: "#222", fontWeight: 600, marginBottom: "4px", display: "block", width: "100%", minWidth: 0 }}>
+        <strong style={{ fontSize: "calc(13px*var(--app-text-scale,1))", color: "#222", fontWeight: 600, marginBottom: "4px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.35, minHeight: "calc(2.7em * var(--app-text-scale,1))", width: "100%", minWidth: 0 }}>
           {renderShoppingCardText(item.title)}
         </strong>
         <div style={{ fontSize: "calc(11px*var(--app-text-scale,1))", color: "#888", marginBottom: "8px" }}>{item.merchantLabel}</div>
@@ -1964,8 +1964,15 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
           setConfirmCheckoutOpen(false);
           setPaymentError(null);
         }}>
-          <div className="cp-shopping-translation-sheet" role="dialog" aria-modal="true" aria-label="选择付款方式" onClick={event => event.stopPropagation()}>
-            <div className="cp-shopping-translation-head">
+          <div
+            className="cp-shopping-translation-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="选择付款方式"
+            onClick={event => event.stopPropagation()}
+            style={{ maxHeight: "min(82vh, 620px)", display: "flex", flexDirection: "column" }}
+          >
+            <div className="cp-shopping-translation-head" style={{ flexShrink: 0 }}>
               <span>选择付款方式</span>
               <button type="button" onClick={() => {
                 setConfirmCheckoutOpen(false);
@@ -1973,7 +1980,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
               }}>Close</button>
             </div>
 
-            <div style={{ background: "#fff7ed", border: "1px solid rgba(255,107,0,0.14)", borderRadius: "18px", padding: "14px 16px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+            <div style={{ background: "#fff7ed", border: "1px solid rgba(255,107,0,0.14)", borderRadius: "18px", padding: "14px 16px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexShrink: 0 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                 <span style={{ fontSize: "calc(11px*var(--app-text-scale,1))", color: "#9a5a18", fontWeight: 700 }}>应付金额</span>
                 <strong style={{ fontSize: "calc(22px*var(--app-text-scale,1))", color: "#222", lineHeight: 1 }}>{formatShoppingAmount(cartTotals.totalPayment)}</strong>
@@ -1981,7 +1988,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
               <CreditCard size={24} color="#ff6b00" />
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "42vh", overflowY: "auto", paddingRight: "2px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "54vh", overflowY: "auto", paddingRight: "2px", flex: "1 1 auto", minHeight: 0 }}>
               {[
                 {
                   id: WALLET_BALANCE_ACCOUNT_ID,
@@ -2045,7 +2052,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
               </div>
             ) : null}
 
-            <div style={{ display: "flex", gap: "10px", justifyContent: "space-between", marginTop: "14px" }}>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "space-between", marginTop: "14px", flexShrink: 0 }}>
               <button type="button" onClick={() => {
                 setConfirmCheckoutOpen(false);
                 setPaymentError(null);
