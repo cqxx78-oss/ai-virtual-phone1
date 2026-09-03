@@ -420,8 +420,8 @@
 }
 
 .diary-font-panel {
-  width: min(340px, calc(100vw - 36px));
-  max-height: min(82vh, 640px);
+  width: min(350px, calc(100vw - 32px));
+  max-height: min(88vh, 740px);
   overflow-y: auto;
   border-radius: 22px;
   background:
@@ -539,12 +539,13 @@
 }
 
 .diary-font-custom-list {
-  max-height: 200px;
+  max-height: 280px;
   overflow-y: auto;
   padding-right: 2px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  scrollbar-width: thin;
 }
 
 .diary-font-custom-item {

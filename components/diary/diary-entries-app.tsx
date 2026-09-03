@@ -231,7 +231,7 @@ export function DiaryEntriesApp({ onBack, onNotice }: DiaryEntriesAppProps) {
         name: fontName,
         assetId,
       };
-      const nextFonts = [...customFonts, newFont];
+      const nextFonts = [newFont, ...customFonts];
       setCustomFonts(nextFonts);
       saveDiaryCustomFonts(nextFonts);
       setCustomFontUrls(prev => ({ ...prev, [assetId]: dataUrl }));
