@@ -57,7 +57,7 @@
 }
 
 .chat-app .chat-room-wrapper > .chat-room-bg-layer {
-  top: calc(var(--safe-area-top, 48px) + var(--page-header-content-height, 42px) + var(--chat-plugin-header-height, 0px)) !important;
+  top: calc(var(--safe-area-top, 0px) + var(--page-header-content-height, 42px) + var(--chat-plugin-header-height, 0px)) !important;
   bottom: var(--chat-bottom-reserve, 120px) !important;
 }
 
