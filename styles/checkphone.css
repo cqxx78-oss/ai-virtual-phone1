@@ -3615,11 +3615,14 @@
 }
 
 .cp-shopping-card-title-original {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .cp-shopping-card-title-line .cp-shopping-card-title-original {
