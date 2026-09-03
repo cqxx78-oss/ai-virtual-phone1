@@ -337,7 +337,8 @@
   margin-top: 2px;
   display: grid;
   grid-template-columns: repeat(4, var(--slot-size));
-  grid-template-rows: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(0, max-content));
+  align-content: start;
   column-gap: var(--slot-gap-x);
   row-gap: var(--slot-gap-y);
   min-height: 0;
