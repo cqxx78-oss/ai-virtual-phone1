@@ -187,8 +187,8 @@
 }
 
 .phone-shell-wrap[data-hide-top-bar="1"] {
-  --phone-titlebar-safe-top: max(12px, env(safe-area-inset-top, 0px));
-  --page-header-safe-top: var(--phone-titlebar-safe-top);
+  --phone-titlebar-safe-top: var(--safe-area-top, 44px);
+  --page-header-safe-top: var(--safe-area-top, 44px);
   --home-grid-top-offset: 24px;
 }
 
