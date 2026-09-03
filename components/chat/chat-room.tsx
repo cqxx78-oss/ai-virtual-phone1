@@ -1200,9 +1200,12 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     }, []);
 
     const [currentBgImage, setCurrentBgImage] = useState<string | undefined>(session.backgroundImage);
-    const [bgImageResolved, setBgImageResolved] = useState<string | null>(null);
-    const [bgLoading, setBgLoading] = useState(!!session.backgroundImage);
-
+    const [bgImageResolved, setBgImageResolved] = useState<string | null>(() => {
+        const bg = session.backgroundImage;
+        if (!bg) return null;
+        if (bg.startsWith("data:") || bg.startsWith("http")) return bg;
+        return null;
+    });
     const wrapperRef = useRef<HTMLDivElement>(null);
     const [unreadJumpFirstId, setUnreadJumpFirstId] = useState<string | null>(null);
     const [unreadJumpCount, setUnreadJumpCount] = useState(0);
@@ -1278,22 +1281,18 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     useEffect(() => {
         if (!currentBgImage) {
             setBgImageResolved(null);
-            setBgLoading(false);
             return;
         }
         if (currentBgImage.startsWith("data:") || currentBgImage.startsWith("http")) {
             setBgImageResolved(currentBgImage);
-            setBgLoading(false);
             return;
         }
         // It's an ID — load from IndexedDB
-        setBgLoading(true);
         import("@/lib/chat-asset-storage").then(({ getChatImageFromIndexedDB }) => {
             getChatImageFromIndexedDB(currentBgImage!).then(dataUrl => {
                 if (dataUrl) {
                     setBgImageResolved(dataUrl);
                 }
-                setBgLoading(false);
             });
         });
     }, [currentBgImage]);
@@ -5245,16 +5244,13 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     }
 
     return (
-        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20 overflow-hidden relative`} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
+        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20 overflow-hidden relative`} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
             {/* 聊天室背景图层：淡入渲染，加载中显示骨架色 */}
             {bgImageResolved ? (
                 <div
-                    className="chat-room-bg-layer absolute inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out"
+                    className="chat-room-bg-layer absolute inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat "
                     style={{ backgroundImage: `url(${bgImageResolved})` }}
                 />
-            ) : currentBgImage ? (
-                // 有背景图配置但还没加载完：显示骨架色占位
-                <div className="absolute inset-0 pointer-events-none -z-10 bg-[var(--c-input)]" />
             ) : null}
             {/* Custom CSS Injection for this session — scoped to prevent leaking */}
             {liveCSS && (

@@ -1813,7 +1813,6 @@ export function MediaImageWithPreview({
     regenerating?: boolean;
 }) {
     const [preview, setPreview] = useState(false);
-    const [imgLoaded, setImgLoaded] = useState(false);
     const saveName = filename || title;
     return (
         <>
@@ -1823,8 +1822,7 @@ export function MediaImageWithPreview({
                     <img
                         src={url}
                         alt={title}
-                        style={{ cursor: "pointer", opacity: imgLoaded ? 1 : 0, transition: "opacity 0.2s ease-out" }}
-                        onLoad={() => setImgLoaded(true)}
+                        style={{ cursor: "pointer" }}
                         onError={onError}
                     />
                 </div>
