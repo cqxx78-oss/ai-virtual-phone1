@@ -100,6 +100,12 @@ function isCallSysMsg(msg: ChatMessage): boolean {
 const ACTION_MEDIA_TYPES = new Set(["poke", "accept_red_packet", "decline_red_packet", "accept_transfer", "decline_transfer", "accept_payment_request", "decline_payment_request", "group_admin_notice"]);
 // 拍一拍/群管理通知/通话留痕渲染成灰色系统小字，没有 💭 面板入口——
 // 状态栏/内心独白/状态值挂上去会被显示层吞掉，挂载时必须跳过它们
+function calculateBubbleTypingDelay(content?: string): number {
+    const charCount = (content || "").trim().length;
+    // 模拟真人打字节奏：基础起步 800ms + 每字 35ms，最短 800ms，最长限制在 6500ms 避免过久
+    return Math.min(Math.max(800, 800 + charCount * 35), 6500);
+}
+
 function canCarryFoldedPanel(part: { content?: string; mediaType?: ChatMessage["mediaType"] }): boolean {
     if (part.mediaType === "poke" || part.mediaType === "group_admin_notice") return false;
     return !CALL_SYS_RE.test(part.content || "");
@@ -2501,7 +2507,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 if (part.mediaType === "poke") {
                     const pokeSender = (part.mediaData?.pokeSender === "我" ? r.characterName : part.mediaData?.pokeSender) || r.characterName;
                     const pokeTarget = part.mediaData?.pokeTarget || "某人";
-                    if (!isFirst) await abortableDelay(800, guard?.signal);
+                    if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content), guard?.signal);
                     throwIfGenerationStopped(guard);
                     isFirst = false;
                     const msg = pushChatMessage({
@@ -2527,7 +2533,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                     });
                     continue;
                 }
-                if (!isFirst) await abortableDelay(800, guard?.signal);
+                if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content), guard?.signal);
                 throwIfGenerationStopped(guard);
                 isFirst = false;
                 const attachHere = !attachedState && canCarryFoldedPanel(part);
@@ -2981,7 +2987,8 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
         } else {
             publishVisibleMessage(messageDrafts[0]);
             for (let i = 1; i < messageDrafts.length; i++) {
-                await abortableDelay(800, options?.signal);
+                const delayMs = calculateBubbleTypingDelay(messageDrafts[i]?.draft?.content);
+                await abortableDelay(delayMs, options?.signal);
                 throwIfGenerationStopped(options);
                 publishVisibleMessage(messageDrafts[i]);
             }
