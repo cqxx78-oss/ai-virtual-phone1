@@ -5249,7 +5249,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
             {/* 聊天室背景图层：淡入渲染，加载中显示骨架色 */}
             {bgImageResolved ? (
                 <div
-                    className="absolute inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out"
+                    className="chat-room-bg-layer absolute inset-0 pointer-events-none -z-10 bg-cover bg-center bg-no-repeat transition-opacity duration-300 ease-out"
                     style={{ backgroundImage: `url(${bgImageResolved})` }}
                 />
             ) : currentBgImage ? (
