@@ -412,6 +412,10 @@ export function ChatSettingsPanel({
     const [editingCSS, setEditingCSS] = useState(false);
     const [showScreenEffects, setShowScreenEffects] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
+    const [showBgActionSheet, setShowBgActionSheet] = useState(false);
+    const [showBgUrlModal, setShowBgUrlModal] = useState(false);
+    const [bgUrlDraft, setBgUrlDraft] = useState("");
+    const bgFileInputRef = useRef<HTMLInputElement | null>(null);
     // TA 的电脑：翻看角色云端电脑（连接了角色电脑才显示入口）
     const [showComputer, setShowComputer] = useState(false);
     // 聊天信息子页面（搜索聊天记录、角色电脑、CSS 编辑器、状态栏定制、特效设置等）纳入导航栈
@@ -444,6 +448,18 @@ export function ChatSettingsPanel({
             return pushNav(() => setShowScreenEffects(false), "chatSettings:screenEffects");
         }
     }, [showScreenEffects]);
+
+    useEffect(() => {
+        if (showBgActionSheet) {
+            return pushNav(() => setShowBgActionSheet(false), "chatSettings:bgAction");
+        }
+    }, [showBgActionSheet]);
+
+    useEffect(() => {
+        if (showBgUrlModal) {
+            return pushNav(() => setShowBgUrlModal(false), "chatSettings:bgUrl");
+        }
+    }, [showBgUrlModal]);
 
     const [searchQuery, setSearchQuery] = useState("");
     const [submittedSearchQuery, setSubmittedSearchQuery] = useState("");
@@ -713,6 +729,28 @@ export function ChatSettingsPanel({
             console.error("Failed to save image", error);
             alert("图片保存失败，请重试");
         }
+    };
+
+    const handleSaveBgUrl = async (url: string) => {
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        try {
+            const res = await fetch(trimmed, { mode: "cors" });
+            if (res.ok) {
+                const blob = await res.blob();
+                const { saveChatImageToIndexedDB } = await import("@/lib/chat-asset-storage");
+                const id = await saveChatImageToIndexedDB(blob);
+                setBackgroundImage(id);
+                updateSession({ backgroundImage: id });
+                setShowBgUrlModal(false);
+                return;
+            }
+        } catch {
+            // 跨域或网络受限时降级直接存 URL，浏览器自带 HTTP 缓存且 ChatRoom 支持直链
+        }
+        setBackgroundImage(trimmed);
+        updateSession({ backgroundImage: trimmed });
+        setShowBgUrlModal(false);
     };
 
     // Group video: per-participant background upload
@@ -1125,15 +1163,15 @@ export function ChatSettingsPanel({
 
                 {/* Backgrounds & UI */}
                 <div className="menu-group">
-                    <label className="menu-item">
+                    <div className="menu-item cursor-pointer" onClick={() => setShowBgActionSheet(true)}>
                         <ChatInfoIcon icon={ImageIcon} color={BINDING_ACCENTS.api} />
                         <div className="menu-label-group"><span className="menu-label">聊天背景</span></div>
                         <div className="menu-right">
-                            {backgroundImage && <><span className="menu-desc mr-1">已设置</span><button className="menu-desc mr-1 text-[var(--c-danger)]" onClick={e => { e.preventDefault(); setBackgroundImage(""); updateSession({ backgroundImage: "" }); }}>清除</button></>}
+                            {backgroundImage && <><span className="menu-desc mr-1">已设置</span><button className="menu-desc mr-1 text-[var(--c-danger)]" onClick={e => { e.preventDefault(); e.stopPropagation(); setBackgroundImage(""); updateSession({ backgroundImage: "" }); }}>清除</button></>}
                             <ChevronRight size={16} />
                         </div>
-                        <input type="file" accept="image/*" onChange={e => handleImageUpload(e, setBackgroundImage, "backgroundImage")} className="hidden" />
-                    </label>
+                        <input ref={bgFileInputRef} type="file" accept="image/*" onChange={e => handleImageUpload(e, setBackgroundImage, "backgroundImage")} className="hidden" />
+                    </div>
                     {session.isGroup ? (
                         <>
                             <div className="menu-item" style={{ cursor: "default" }}>
@@ -1322,6 +1360,76 @@ export function ChatSettingsPanel({
                             </div>
                         )}
                         <button className="ui-btn ui-btn-ghost w-full" onClick={() => setShowInvitePicker(false)}>取消</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Chat Background Action Sheet */}
+            {showBgActionSheet && (
+                <div className="modal-overlay" onClick={() => setShowBgActionSheet(false)}>
+                    <div className="modal-dialog" onClick={e => e.stopPropagation()}>
+                        <span className="modal-header-title">设置聊天背景</span>
+                        <div className="flex flex-col gap-2 w-full">
+                            <button
+                                className="ui-btn ui-btn-ghost w-full"
+                                onClick={() => {
+                                    setShowBgActionSheet(false);
+                                    bgFileInputRef.current?.click();
+                                }}
+                            >
+                                从相册/本地选择
+                            </button>
+                            <button
+                                className="ui-btn ui-btn-ghost w-full"
+                                onClick={() => {
+                                    setShowBgActionSheet(false);
+                                    setBgUrlDraft(backgroundImage.startsWith("http") || backgroundImage.startsWith("data:") ? backgroundImage : "");
+                                    setShowBgUrlModal(true);
+                                }}
+                            >
+                                输入图片 URL / 路径
+                            </button>
+                            {backgroundImage && (
+                                <button
+                                    className="ui-btn ui-btn-danger w-full"
+                                    onClick={() => {
+                                        setBackgroundImage("");
+                                        updateSession({ backgroundImage: "" });
+                                        setShowBgActionSheet(false);
+                                    }}
+                                >
+                                    清除背景
+                                </button>
+                            )}
+                        </div>
+                        <button className="ui-btn ui-btn-ghost w-full" onClick={() => setShowBgActionSheet(false)}>取消</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Input Background URL */}
+            {showBgUrlModal && (
+                <div className="modal-overlay" onClick={() => setShowBgUrlModal(false)}>
+                    <div className="modal-dialog" onClick={e => e.stopPropagation()}>
+                        <div className="ts-17 font-semibold text-center text-[var(--c-text)]">输入图片 URL</div>
+                        <p className="menu-desc text-center !mt-0">支持 WebP、PNG、JPG 或 GIF 等网络图片直链，会自动缓存到本地。</p>
+                        <Input
+                            type="url"
+                            value={bgUrlDraft}
+                            onChange={e => setBgUrlDraft(e.target.value)}
+                            placeholder="https://example.com/background.webp"
+                            autoFocus
+                        />
+                        <div className="flex gap-3 w-full">
+                            <button onClick={() => setShowBgUrlModal(false)} className="ui-btn ui-btn-ghost flex-1">取消</button>
+                            <button
+                                onClick={() => handleSaveBgUrl(bgUrlDraft)}
+                                disabled={!bgUrlDraft.trim()}
+                                className="ui-btn ui-btn-success flex-1"
+                            >
+                                保存
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
