@@ -1232,6 +1232,15 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <button
+                type="button"
+                aria-label="刷新首页推荐"
+                onClick={() => setConfirmRefreshOpen(true)}
+                disabled={loading}
+                style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid #eaeaea", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#333", cursor: loading ? "default" : "pointer" }}
+              >
+                <RefreshCw size={18} strokeWidth={2.2} className={loadingTask === "refresh" ? "cp-spin" : ""} />
+              </button>
               <button type="button" aria-label="清空购物痕迹" onClick={() => setClearConfirmOpen(true)} style={{ width: "40px", height: "40px", borderRadius: "50%", border: "1px solid #eaeaea", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#333" }}>
                 <Trash2 size={18} strokeWidth={2.2} />
               </button>
@@ -1622,33 +1631,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
               })}
             </nav>
 
-            {selectedTab === "home" ? (
-              <button
-                type="button"
-                aria-label="刷新首页推荐"
-                onClick={() => setConfirmRefreshOpen(true)}
-                disabled={loading}
-                style={{
-                  position: "absolute",
-                  right: "24px",
-                  bottom: "calc(86px + env(safe-area-inset-bottom, 0px))",
-                  zIndex: 12,
-                  width: "54px",
-                  height: "54px",
-                  borderRadius: "50%",
-                  border: "none",
-                  background: loading ? "#ffb27a" : "#ff6b00",
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 14px 30px rgba(255,107,0,0.34)",
-                  cursor: loading ? "default" : "pointer",
-                }}
-              >
-                <RefreshCw size={22} strokeWidth={2.6} className={loadingTask === "refresh" ? "cp-spin" : ""} />
-              </button>
-            ) : null}
+
           </>
         </div>
 
