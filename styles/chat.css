@@ -56,6 +56,11 @@
   background-color: transparent !important;
 }
 
+.chat-app .chat-room-wrapper > .chat-room-bg-layer {
+  top: calc(var(--safe-area-top, 48px) + var(--page-header-content-height, 42px) + var(--chat-plugin-header-height, 0px)) !important;
+  bottom: var(--chat-bottom-reserve, 120px) !important;
+}
+
 .chat-app .chat-room-layer:has(.chat-room-wrapper[data-has-bg-image]) {
   background: transparent !important;
 }
