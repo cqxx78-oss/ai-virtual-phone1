@@ -1039,6 +1039,56 @@
   pointer-events: none;
 }
 
+/* ── 工坊操作完成全屏悬浮胶囊 ── */
+
+.phone-shell-workshop-notice {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--safe-area-top, 44px) + 8px);
+  transform: translateX(-50%);
+  z-index: 650;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(26, 28, 34, 0.88);
+  color: #ffffff;
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  font-size: calc(12.2px * var(--app-text-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: phoneWorkshopNoticePop 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.phone-shell-workshop-notice-icon {
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.phone-shell-workshop-notice-text {
+  line-height: 1;
+}
+
+@keyframes phoneWorkshopNoticePop {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, -8px, 0) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
+}
+
 /* ── Standalone page (characters etc.) ── */
 
 .page-frame {

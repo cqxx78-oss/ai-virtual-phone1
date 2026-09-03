@@ -1067,6 +1067,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   const [desktopReady, setDesktopReady] = useState(false);
   const [glassPaintPass, setGlassPaintPass] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [workshopNotice, setWorkshopNotice] = useState<string | null>(null);
   const [activeApp, setActiveApp] = useState<DesktopIconId | null>(null);
   const [customApps, setCustomApps] = useState<InstalledCustomApp[]>([]);
   // 自定义 APP 桌面图标样式偏好（global = 忽略上传图标走全局效果）
@@ -2141,6 +2142,25 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     };
     window.addEventListener("global-notice", onGlobalNotice);
     return () => window.removeEventListener("global-notice", onGlobalNotice);
+  }, []);
+
+  useEffect(() => {
+    if (!workshopNotice) return;
+    const timeout = window.setTimeout(() => setWorkshopNotice(null), 2600);
+    return () => window.clearTimeout(timeout);
+  }, [workshopNotice]);
+
+  useEffect(() => {
+    const onWorkshopNotice = (e: Event) => {
+      const text = (e as CustomEvent).detail;
+      if (typeof text === "string" && text) {
+        setWorkshopNotice(text);
+      } else {
+        setWorkshopNotice("工坊已完成操作 ✓");
+      }
+    };
+    window.addEventListener("workshop-notice", onWorkshopNotice);
+    return () => window.removeEventListener("workshop-notice", onWorkshopNotice);
   }, []);
 
   useEffect(() => {
@@ -4212,6 +4232,13 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
               {notice ? (
                 <aside className="phone-shell-notice" role="status" aria-live="polite">
                   {notice}
+                </aside>
+              ) : null}
+
+              {workshopNotice ? (
+                <aside className="phone-shell-workshop-notice" role="status" aria-live="polite">
+                  <span className="phone-shell-workshop-notice-icon" aria-hidden>⚒</span>
+                  <span className="phone-shell-workshop-notice-text">{workshopNotice}</span>
                 </aside>
               ) : null}
 

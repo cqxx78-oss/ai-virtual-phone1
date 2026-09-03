@@ -608,6 +608,9 @@ export async function sendQaMessage(
         if (contextUsageOf(sessions.find((s) => s.id === sessionId) ?? null) >= 1) {
             await compactSessionContext(sessionId);
         }
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("workshop-notice", { detail: "工坊已完成操作 ✓" }));
+        }
     } catch (error) {
         const finalTools = toolStatuses.length ? toolStatuses.map((t) => (t.running ? { ...t, running: false } : t)) : undefined;
         const finalSegments = segments.length
