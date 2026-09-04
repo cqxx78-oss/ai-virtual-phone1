@@ -26,6 +26,11 @@ const MINIMAX_PITCH_MIN = -12;
 const MINIMAX_PITCH_MAX = 12;
 const MINIMAX_PITCH_STEP = 1;
 const DEFAULT_SPEECH_PITCH = 0;
+// Minimax voice_setting.vol：音量倍数，0.2~3.0
+const MINIMAX_VOLUME_MIN = 0.2;
+const MINIMAX_VOLUME_MAX = 3.0;
+const MINIMAX_VOLUME_STEP = 0.1;
+const DEFAULT_SPEECH_VOLUME = 1.0;
 const VOICE_PROVIDER_OPTIONS = [
     { value: "OpenAI", label: "OpenAI TTS" },
     { value: "MinimaxCN", label: "Minimax 语音国内版" },
@@ -245,7 +250,10 @@ function normalizeVoiceConfigs(configs: VoiceApiConfig[]): VoiceApiConfig[] {
             const speechPitch = typeof config.speechPitch === "number" && Number.isFinite(config.speechPitch)
                 ? Math.min(MINIMAX_PITCH_MAX, Math.max(MINIMAX_PITCH_MIN, Math.round(config.speechPitch)))
                 : DEFAULT_SPEECH_PITCH;
-            return { ...config, baseUrl, speechSpeed, speechPitch };
+            const speechVolume = typeof config.speechVolume === "number" && Number.isFinite(config.speechVolume)
+                ? Math.min(MINIMAX_VOLUME_MAX, Math.max(MINIMAX_VOLUME_MIN, Math.round(config.speechVolume * 10) / 10))
+                : DEFAULT_SPEECH_VOLUME;
+            return { ...config, baseUrl, speechSpeed, speechPitch, speechVolume };
         });
 }
 
@@ -855,6 +863,27 @@ export function VoiceSettings() {
                                                         <span className="absolute left-1 whitespace-nowrap">{MINIMAX_PITCH_MIN}</span>
                                                         <span className="absolute whitespace-nowrap" style={{ left: "50%", transform: "translateX(-50%)" }}>0 默认</span>
                                                         <span className="absolute right-1 whitespace-nowrap">+{MINIMAX_PITCH_MAX}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1 -mt-1">
+                                                    <div className="flex items-center justify-between px-1">
+                                                        <label className="menu-desc">音量 (Volume)</label>
+                                                        <span className="menu-label font-medium">{(config.speechVolume ?? DEFAULT_SPEECH_VOLUME).toFixed(1)}×</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min={MINIMAX_VOLUME_MIN}
+                                                        max={MINIMAX_VOLUME_MAX}
+                                                        step={MINIMAX_VOLUME_STEP}
+                                                        value={config.speechVolume ?? DEFAULT_SPEECH_VOLUME}
+                                                        onChange={(e) => updateConfig(config.id, { speechVolume: Number(e.target.value) })}
+                                                        className="w-full accent-black"
+                                                        aria-label="Minimax 音量"
+                                                    />
+                                                    <div className="relative h-4 px-1 text-xs text-gray-500" aria-hidden="true">
+                                                        <span className="absolute left-1 whitespace-nowrap">{MINIMAX_VOLUME_MIN.toFixed(1)}×</span>
+                                                        <span className="absolute whitespace-nowrap" style={{ left: "28.57%", transform: "translateX(-50%)" }}>1.0× 默认</span>
+                                                        <span className="absolute right-1 whitespace-nowrap">{MINIMAX_VOLUME_MAX.toFixed(1)}×</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col gap-1 mt-1">
