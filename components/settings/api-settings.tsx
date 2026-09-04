@@ -366,6 +366,10 @@ export function ApiSettings() {
         return ["全部", ...manageableGroups];
     }, [manageableGroups]);
 
+    const existingGroups = useMemo(() => {
+        return manageableGroups.filter(g => g !== "默认");
+    }, [manageableGroups]);
+
     // 分组管理逻辑：改名、重排、删除（清空该组）
     const handleRenameGroup = (oldName: string, newName: string) => {
         if (oldName === "默认") return;
