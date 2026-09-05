@@ -76,6 +76,7 @@
     inset: 0;
     display: flex;
     flex-direction: column;
+    isolation: isolate;
     background-color: var(--c-music-bg);
     /* Very soft light green/white base */
     background-image:
@@ -87,6 +88,19 @@
         radial-gradient(circle at 50% 50%, var(--c-music-bg-center) 0%, transparent 70%);
     color: var(--c-music-text);
     overflow: hidden;
+}
+
+/* Custom background is a separate layer so later theme rules cannot replace it. */
+.music-app-custom-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.music-app[data-custom-bg] {
+    background-color: transparent;
+    background-image: none;
 }
 
 .music-toast-overlay {
@@ -5463,10 +5477,26 @@
    ══════════════════════════════════════════ */
 
 .music-player.mp-lumen {
+    isolation: isolate;
     background: #f8f9fa;
 }
 
+/* Keep the uploaded player image above the theme base and below all controls. */
+.music-player-custom-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.music-player > :not(.music-player-custom-bg) {
+    position: relative;
+    z-index: 1;
+}
+
 .mp-ambient {
+    z-index: 0;
+}
     position: absolute;
     inset: 0;
     pointer-events: none;

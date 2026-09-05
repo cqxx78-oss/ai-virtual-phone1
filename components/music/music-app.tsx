@@ -483,7 +483,8 @@ export default function MusicApp({ onClose }: Props) {
     };
 
     return (
-        <div className="music-app" style={appBgStyle(bgCfg)} {...(player.currentTrack ? { "data-nowbar": "" } : {})}>
+        <div className="music-app" {...(player.currentTrack ? { "data-nowbar": "" } : {})} {...(bgCfg.image ? { "data-custom-bg": "" } : {})}>
+            {bgCfg.image && <div className="music-app-custom-bg" style={appBgStyle(bgCfg)} aria-hidden="true" />}
             {customCss && <SessionCustomCSS css={customCss} scope=".music-app" />}
             {musicToast && (
                 <div className="music-toast-overlay">

@@ -442,7 +442,6 @@ export default function MusicPlayer() {
         "--mp-c1": palette[0],
         "--mp-c2": palette[1],
         "--mp-c3": palette[2],
-        ...(customBg || {}),
     } as React.CSSProperties;
 
     // 下滑退出手势支持
@@ -476,6 +475,7 @@ export default function MusicPlayer() {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
         >
+            {customBg && <div className="music-player-custom-bg" style={customBg} aria-hidden="true" />}
             {musicToast && (
                 <div className="music-toast-overlay">
                     <div className="music-toast-chip">
