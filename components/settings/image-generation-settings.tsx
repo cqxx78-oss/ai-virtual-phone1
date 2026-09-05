@@ -146,9 +146,10 @@ export function ImageGenerationSettings() {
     const [status, setStatus] = useState<Record<string, Status | null>>({});
     const [testPreviewUrl, setTestPreviewUrl] = useState<Record<string, string | null>>({});
     
-    const [customW, setCustomW] = useState("2048");
-    const [customH, setCustomH] = useState("2048");
-    const lastCustomSize = useRef("2048x2048");
+    const [customW, setCustomW] = useState("1024");
+    const [customH, setCustomH] = useState("1024");
+    const lastCustomSize = useRef("");
+    const [isCustomMode, setIsCustomMode] = useState(false);
     const [sizeTab, setSizeTab] = useState<"default" | "landscape">("default");
 
     useEffect(() => {
@@ -202,14 +203,22 @@ export function ImageGenerationSettings() {
 
     // 同步自定义宽高
     useEffect(() => {
-        if (!editingProfile) return;
-        if (!isCustomSize(editingProfile.size)) return;
-        const parsed = parseCustomSize(editingProfile.size);
-        if (!parsed) return;
-        lastCustomSize.current = `${parsed.w}x${parsed.h}`;
-        setCustomW(parsed.w);
-        setCustomH(parsed.h);
-    }, [editingProfile?.size]);
+        if (!editingProfile) {
+            setIsCustomMode(false);
+            return;
+        }
+        if (isCustomSize(editingProfile.size)) {
+            setIsCustomMode(true);
+            const parsed = parseCustomSize(editingProfile.size);
+            if (parsed) {
+                lastCustomSize.current = `${parsed.w}x${parsed.h}`;
+                setCustomW(parsed.w);
+                setCustomH(parsed.h);
+            }
+        } else {
+            setIsCustomMode(false);
+        }
+    }, [editingProfile?.id]);
 
     useEffect(() => {
         let cancelled = false;
@@ -558,17 +567,21 @@ export function ImageGenerationSettings() {
 
     const selectSize = useCallback((profile: ImageGenerationProfile, value: string) => {
         if (value !== "custom") {
+            setIsCustomMode(false);
             updateProfile(profile.id, { size: value });
             return;
         }
+        setIsCustomMode(true);
         const parsed = parseCustomSize(profile.size);
-        const next = isCustomSize(profile.size) && parsed ? `${parsed.w}x${parsed.h}` : lastCustomSize.current;
+        const next = isCustomSize(profile.size) && parsed
+            ? `${parsed.w}x${parsed.h}`
+            : (lastCustomSize.current || `${customW}x${customH}`);
         const [w, h] = next.split("x");
-        setCustomW(w || "2048");
-        setCustomH(h || "2048");
+        setCustomW(w || "1024");
+        setCustomH(h || "1024");
         lastCustomSize.current = next;
         updateProfile(profile.id, { size: next });
-    }, [updateProfile]);
+    }, [updateProfile, customW, customH]);
 
     const updateCustomSize = useCallback((profile: ImageGenerationProfile, w: string, h: string) => {
         const nw = w.replace(/\D/g, "");
@@ -1001,11 +1014,12 @@ export function ImageGenerationSettings() {
                                         </div>
                                     </div>
                                     <Select
-                                        value={isCustomSize(editingProfile.size) ? "custom" : editingProfile.size}
+                                        value={isCustomMode || isCustomSize(editingProfile.size) ? "custom" : editingProfile.size}
                                         onChange={(event) => selectSize(editingProfile, event.target.value)}
                                     >
                                         {/* 当前选中的值如果不属于当前 tab，先作为一项展示以防显示空白 */}
-                                        {!isCustomSize(editingProfile.size) &&
+                                        {!isCustomMode &&
+                                            !isCustomSize(editingProfile.size) &&
                                             editingProfile.size !== "custom" &&
                                             !(sizeTab === "default" ? PORTRAIT_SIZE_PRESETS : LANDSCAPE_SIZE_PRESETS).some(i => i.value === editingProfile.size) && (
                                                 <option value={editingProfile.size}>
@@ -1030,7 +1044,7 @@ export function ImageGenerationSettings() {
                                 </div>
                             </div>
 
-                            {isCustomSize(editingProfile.size) && (
+                            {(isCustomMode || isCustomSize(editingProfile.size)) && (
                                 <div className="flex flex-col gap-1">
                                     <label className="menu-desc ml-1">自定义分辨率（宽 × 高）</label>
                                     <div className="flex items-center gap-2">
