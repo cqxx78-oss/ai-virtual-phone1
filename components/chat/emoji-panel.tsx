@@ -191,7 +191,6 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                 )}
                 {activePack?.stickers.map(sticker => {
                     const url = packUrlMap[`${activePack.id}:${sticker.name}`];
-                    const showName = sticker.name && !sticker.name.startsWith("sticker_") && !/^\d+$/.test(sticker.name);
                     return (
                         <button
                             key={`${activePack.id}:${sticker.id}`}
@@ -199,15 +198,15 @@ export function StickerPanel({ onSend, characterId, characterIds }: StickerPanel
                             title={sticker.name}
                             className="border-none bg-transparent cursor-pointer p-0.5 rounded-lg flex flex-col items-center justify-start gap-0.5 min-w-0 overflow-hidden"
                         >
-                            <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                            <div className="w-16 h-16 flex items-center justify-center shrink-0">
                                 {url ? (
-                                    <img src={url} alt={sticker.name} className="w-12 h-12 max-h-12 object-contain" />
+                                    <img src={url} alt={sticker.name} className="w-16 h-16 max-h-16 object-contain" />
                                 ) : (
                                     <span className="ts-11 text-[var(--c-text)] max-w-full truncate">{sticker.name}</span>
                                 )}
                             </div>
                             <span className="ts-11 leading-tight text-[var(--c-text)] opacity-80 w-full text-center truncate min-h-[16px] px-0.5">
-                                {showName ? sticker.name : ""}
+                                {sticker.name || ""}
                             </span>
                         </button>
                     );
