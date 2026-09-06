@@ -803,12 +803,28 @@ export async function sendLLMStreamRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetch(request.url, {
-            method: "POST",
-            headers: request.headers,
-            body: requestBodyJson,
-            signal: llmAbort.signal,
-        });
+        let response: Response;
+        if (request.serverProxy) {
+            response = await fetch("/api/llm-proxy", {
+                method: "POST",
+                body: JSON.stringify({
+                    url: request.url,
+                    method: "POST",
+                    headers: request.headers,
+                    body: requestBodyJson,
+                    stream: true,
+                }),
+                signal: llmAbort.signal,
+            });
+        } else {
+          response = await fetch(request.url, {
+              method: "POST",
+              headers: request.headers,
+              body: requestBodyJson,
+              signal: llmAbort.signal,
+          });
+        }
+
         if (!response.ok) {
             const errorText = await response.text();
             throw new ChatEngineError(`API Stream Error ${response.status}: ${errorText}`);
@@ -920,12 +936,27 @@ export async function sendLLMRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetch(request.url, {
-            method: "POST",
-            headers: request.headers,
-            body: requestBodyJson,
-            signal: llmAbort.signal,
-        });
+        let response: Response;
+        if (request.serverProxy) {
+            response = await fetch("/api/llm-proxy", {
+                method: "POST",
+                body: JSON.stringify({
+                    url: request.url,
+                    method: "POST",
+                    headers: request.headers,
+                    body: requestBodyJson,
+                    stream: false,
+                }),
+                signal: llmAbort.signal,
+            });
+        } else {
+            response = await fetch(request.url, {
+                method: "POST",
+                headers: request.headers,
+                body: requestBodyJson,
+                signal: llmAbort.signal,
+            });
+        }
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -1105,17 +1136,33 @@ export async function sendLLMToolStreamRequest(
     const firedToolCallStarts = new Set<number>();
 
     try {
-        const response = await fetch(request.url, {
-            method: "POST",
-            headers: request.headers,
-            body: requestBodyJson,
-            signal: llmAbort.signal,
-        });
+        let response: Response;
+        if (request.serverProxy) {
+            response = await fetch("/api/llm-proxy", {
+                method: "POST",
+                body: JSON.stringify({
+                    url: request.url,
+                    method: "POST",
+                    headers: request.headers,
+                    body: requestBodyJson,
+                    stream: true,
+                }),
+                signal: llmAbort.signal,
+            });
+        } else {
+          response = await fetch(request.url, {
+              method: "POST",
+              headers: request.headers,
+              body: requestBodyJson,
+              signal: llmAbort.signal,
+          });
+        }
 
         if (!response.ok) {
             const errorText = await response.text();
             throw new ChatEngineError(`API Tool Stream Error ${response.status}: ${errorText}`);
         }
+
         if (!response.body) throw new ChatEngineError("原生动作流式响应没有 body。");
 
         const reader = response.body.getReader();

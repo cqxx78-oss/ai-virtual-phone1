@@ -125,6 +125,8 @@ export type ApiConfig = {
     enableImageRecognition: boolean;
     enableImageGeneration: boolean;
     preventEmptyGenerateRambling?: boolean;
+    /** "direct"（默认）= 浏览器直连；"server" = 经服务端转发代理 */
+    requestMode?: "direct" | "server";
 };
 
 // --- VoiceApiConfig (migrated from voice-settings.tsx) ---

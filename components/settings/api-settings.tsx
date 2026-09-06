@@ -478,7 +478,20 @@ export function ApiSettings() {
             const headers: Record<string, string> = { "Content-Type": "application/json" };
             if (!isGoogleNative) headers["Authorization"] = `Bearer ${config.apiKey}`;
 
-            const response = await fetch(url, { method: "GET", headers });
+            let response: Response;
+            if (config.requestMode === 'server') {
+                response = await fetch('/api/llm-proxy', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        url,
+                        method: 'GET',
+                        headers,
+                        stream: false,
+                    }),
+                });
+            } else {
+                response = await fetch(url, { method: "GET", headers });
+            }
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
@@ -846,6 +859,25 @@ export function ApiSettings() {
                                                             : "默认用官方端点，留空即可"
                                                 }
                                             />
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                          <label className="menu-desc ml-1">请求方式</label>
+                                            <div className="flex items-center gap-3 rounded-lg bg-black/5 p-1">
+                                                <button
+                                                    onClick={() => updateConfig(config.id, { requestMode: "direct" })}
+                                                    className={`flex-1 rounded-md px-3 py-1.5 text-center text-xs font-bold transition-all ${config.requestMode !== 'server' ? 'bg-white shadow-sm' : 'text-black/60'}`}>
+                                                    🌐 浏览器直连
+                                                </button>
+                                                <button
+                                                    onClick={() => updateConfig(config.id, { requestMode: "server" })}
+                                                    className={`flex-1 rounded-md px-3 py-1.5 text-center text-xs font-bold transition-all ${config.requestMode === 'server' ? 'bg-white shadow-sm' : 'text-black/60'}`}>
+                                                    ⚡️ 服务端转发
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-black/50 px-2 leading-snug mt-1">
+                                                遇到 CORS 跨域错误时，请切换到“服务端转发”。
+                                            </p>
                                         </div>
 
                                         <div className="flex flex-col gap-1">

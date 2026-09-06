@@ -257,13 +257,15 @@ export function buildProviderRequest(
     const guardedMessages = config.enableImageRecognition === true ? messages : stripVisionParts(messages);
     const providerMessages = ensureProviderHasUserMessage(normalizeNativeToolMessageAdjacency(guardedMessages));
 
+    const serverProxy = config.requestMode === "server";
+
     if (providerKind === "anthropic") {
-        return buildAnthropicRequest(config, preset, baseUrl, providerMessages, options);
+        return { ...buildAnthropicRequest(config, preset, baseUrl, providerMessages, options), serverProxy };
     }
     if (providerKind === "gemini") {
-        return buildGeminiRequest(config, preset, baseUrl, providerMessages, options);
+        return { ...buildGeminiRequest(config, preset, baseUrl, providerMessages, options), serverProxy };
     }
-    return buildOpenAICompatibleRequest(config, preset, baseUrl, providerMessages, options);
+    return { ...buildOpenAICompatibleRequest(config, preset, baseUrl, providerMessages, options), serverProxy };
 }
 
 // 剥离逻辑收敛到 api-helpers（更底层，微信助手运行时也照抄同一份正则）；

@@ -157,9 +157,22 @@ export async function simpleLLMCall(
 
         const bodySize = body.length;
         const bodyTokenEstimate = Math.ceil(bodySize / 3);
-        console.log("[simpleLLMCall] Request:", { url: fetchUrl.slice(0, 80), bodySize, bodyTokenEstimate, model: config.defaultModel });
+        console.log("[simpleLLMCall] Request:", { url: fetchUrl.slice(0, 80), bodySize, bodyTokenEstimate, model: config.defaultModel, mode: config.requestMode });
 
-        const res = await fetch(fetchUrl, { method: "POST", headers, body, signal: options?.signal });
+        let res: Response;
+        if (config.requestMode === "server") {
+          const proxyUrl = "/api/llm-proxy";
+          const proxyBody = JSON.stringify({
+            url: fetchUrl,
+            method: "POST",
+            headers,
+            body,
+            stream: false,
+          });
+          res = await fetch(proxyUrl, { method: "POST", body: proxyBody, signal: options?.signal });
+        } else {
+          res = await fetch(fetchUrl, { method: "POST", headers, body, signal: options?.signal });
+        }
 
         if (!res.ok) {
             const errText = await res.text().catch(() => "");
