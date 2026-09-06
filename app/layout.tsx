@@ -8,6 +8,32 @@ import { PWAManifestInjector } from "@/components/pwa-manifest-injector";
 import { PWARegistrar } from "@/components/pwa-registrar";
 import "../styles/fonts.css";
 import "./globals.css";
+import "../styles/tokens.css";
+import "../styles/base.css";
+import "../styles/components.css";
+import "../styles/account.css";
+import "../styles/phone-shell.css";
+import "../styles/widgets.css";
+import "../styles/chat.css";
+import "../styles/character.css";
+import "../styles/animations.css";
+import "../styles/music.css";
+import "../styles/mixology.css";
+import "../styles/calendar.css";
+import "../styles/diary.css";
+import "../styles/story.css";
+import "../styles/vn.css";
+import "../styles/dwelling.css";
+import "../styles/checkphone.css";
+import "../styles/black-market.css";
+import "../styles/game.css";
+import "../styles/app-market.css";
+import "../styles/reality-bridge.css";
+import "../styles/xiaohongshu.css";
+import "../styles/world-builder.css";
+import "../styles/interview-magazine.css";
+import "../styles/cocreate.css";
+import "../styles/qa.css";
 
 export const viewport: Viewport = {
   width: "device-width",
