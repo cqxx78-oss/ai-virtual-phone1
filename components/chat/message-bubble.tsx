@@ -782,14 +782,9 @@ function AppCardBubble({ msg, characterId, characterName }: { msg: ChatMessage; 
     const layout = normalizeAppCardLayout(d?.appCardLayout);
     const title = layout.title || d?.appCardTitle || d?.label || appName;
     const subtitle = layout.subtitle;
-    const rawLayout = cardRecord(d?.appCardLayout);
-    const hasExplicitLayoutBody = Object.prototype.hasOwnProperty.call(rawLayout, "body")
-        || Object.prototype.hasOwnProperty.call(rawLayout, "text");
-    const body = hasExplicitLayoutBody
-        ? layout.body
-        : d?.appDirectiveId
-            ? (d?.appCardBody || "")
-            : (d?.appCardBody || d?.appCardSummary || msg.content);
+    const body = d?.appDirectiveId
+        ? (layout.body || d?.appCardBody || "")
+        : (layout.body || d?.appCardBody || d?.appCardSummary || msg.content);
     const toneClass = d?.appCardTone ? ` tone-${String(d.appCardTone).replace(/[^a-z0-9_-]/gi, "")}` : "";
     const cardOpenDisabled = layout.openDisabled || (layout.actions.length > 0 && layout.actions.every(action => action.disabled));
     const style = {
