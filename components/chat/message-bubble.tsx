@@ -1606,7 +1606,8 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
     const paymentDone = isPaid || isDeclined || d?.status === "canceled";
 
     // Can user act?
-    const canClaimRedPacket = isRedPacket && !isFromUser && !allClaimed && !isDeclined && !alreadyClaimed;
+    // 群聊/拼手气红包（totalRecipients > 1）：发送者自己也可以抢；单人私聊红包仍由对方领取
+    const canClaimRedPacket = isRedPacket && (!isFromUser || totalRecipients > 1) && !allClaimed && !isDeclined && !alreadyClaimed;
     const canActTransfer = isTransfer && !isFromUser && !transferDone && isRecipient;
     const canActPaymentRequest = isPaymentRequest && !isFromUser && !paymentDone;
 
