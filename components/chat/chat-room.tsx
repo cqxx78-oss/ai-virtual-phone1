@@ -2223,9 +2223,9 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
         if (targetMsg.mediaData?.claimedBy?.includes(claimerName)) return;
         const owner = ownerName || getMsgSender(targetMsg);
         const ownerDisplay = owner === (userIdentity?.name) ? "你" : owner;
-        // 发红包的人自己不能领
-        if (claimerName === owner) return;
         const totalRecipients = targetMsg.mediaData?.count || 1;
+        // 单人群聊红包发红包者不能领；多人群聊/拼手气红包（count > 1）发红包的角色本人也可以领
+        if (claimerName === owner && totalRecipients <= 1) return;
         // 已领满则拒绝
         if ((targetMsg.mediaData?.claimedBy?.length || 0) >= totalRecipients) return;
         if (action === "accept") {
