@@ -1758,16 +1758,26 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
                     {paymentError ? <div className="media-modal-status" style={{ color: "#b91c1c" }}>{paymentError}</div> : null}
 
                     {/* Claimed list for red packet */}
-                    {isRedPacket && claimedBy.length > 0 && (
-                        <div className="media-modal-list">
-                            {claimedBy.map((name) => (
-                                <div key={name} className="media-modal-list-row">
-                                    <span>{name}</span>
-                                    <span className="media-modal-list-amt">¥{(claimedAmounts[name] ?? 0).toFixed(2)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {isRedPacket && claimedBy.length > 0 && (() => {
+                        const maxAmt = Math.max(...Object.values(claimedAmounts).map(v => Number(v) || 0), 0);
+                        return (
+                            <div className="media-modal-list">
+                                {claimedBy.map((name) => {
+                                    const amt = Number(claimedAmounts[name] ?? 0);
+                                    const isTop = allClaimed && claimedBy.length > 1 && maxAmt > 0 && amt === maxAmt;
+                                    return (
+                                        <div key={name} className="media-modal-list-row">
+                                            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                                {name}
+                                                {isTop && <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>👑 手气最佳</span>}
+                                            </span>
+                                            <span className="media-modal-list-amt">¥{amt.toFixed(2)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
 
                     {/* Action buttons or status */}
                     {canClaimRedPacket ? (
