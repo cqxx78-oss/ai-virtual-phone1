@@ -1211,8 +1211,10 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
                 description: d?.xiaohongshuDescription,
             });
         case "accept_red_packet":
-            if (isGroup && d?.claimer && d?.owner) return `[${d.claimer}领取了${d.owner}的红包]`;
-            return "[领取红包]";
+            if (isGroup && d?.claimer && d?.owner) {
+                return msg.content || `[${d.claimer}领取了${d.owner}的红包]`;
+            }
+            return msg.content || "[领取红包]";
         case "decline_red_packet":
             if (isGroup && d?.claimer && d?.owner) return `[${d.claimer}退回了${d.owner}的红包]`;
             return "[拒收红包]";
