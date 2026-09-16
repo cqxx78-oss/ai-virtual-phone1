@@ -194,6 +194,7 @@ export function normalizeTextBubbleContent(content: string): string {
     const cleaned = content
         .replace(/\[音乐(?:分享)?(?:[：:][^\]]*)?\]/g, "")
         .replace(/\[[^\]]+拍了拍[^\]]+\]/g, "")
+        .replace(/\[?[^\]\n]+?领取了[^\]\n]+?的红包(?:[，,][^\]\n]*)?\]?/g, "")
         .replace(/\[[^\]]*?(?:获取指令|获取工具)[:：][^\]]*\]/g, "")
         .replace(/\[[^\]]*?(?:执行动作|工具调用)[:：][^\]]*?[（(][\s\S]*?[)）]\]/g, "")
         .replace(/\n{3,}/g, "\n\n")

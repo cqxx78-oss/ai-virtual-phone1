@@ -260,9 +260,9 @@ const RICH_PATTERNS: {
         regex: /\[我向[^\]]+发起了视频通话\]/,
         build: () => ({ content: "", mediaType: "video_call" as const }),
     },
-    // 群聊带主语宾语的格式（优先匹配）
+    // 群聊带主语宾语的格式（优先匹配，兼容带方括号或不带方括号、带金额后缀）
     {
-        regex: /\[([^\]]+)领取了([^\]]+)的红包\]/,
+        regex: /\[?([^\]\n]+?)领取了([^\]\n]+?)的红包(?:[，,]\s*金额[：:]\s*[\d.]+\s*元?)?\]?/,
         build: (m) => ({ content: "", mediaType: "accept_red_packet" as const, mediaData: { claimer: m[1]?.trim(), owner: m[2]?.trim() } }),
     },
     {
