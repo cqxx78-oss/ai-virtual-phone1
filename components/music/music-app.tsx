@@ -1521,6 +1521,68 @@ function NeteaseSongRow({ song, index, formatTime, onPlay }: {
 }
 
 // ── Song List (local) ──
+/** 将图片 File 转为 WebP 格式的 Data URL（若不支持 WebP 则平稳降级 JPEG） */
+function fileToWebpDataUrl(file: File, maxDim = 1080, quality = 0.92): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("图片读取失败")); };
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            try {
+                const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                const w = Math.max(1, Math.round(img.width * scale));
+                const h = Math.max(1, Math.round(img.height * scale));
+                const canvas = document.createElement("canvas");
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) { reject(new Error("Canvas 上下文失败")); return; }
+                ctx.drawImage(img, 0, 0, w, h);
+                const webpUrl = canvas.toDataURL("image/webp", quality);
+                resolve(webpUrl.startsWith("data:image/webp") ? webpUrl : canvas.toDataURL("image/jpeg", quality));
+            } catch (err) {
+                reject(err);
+            }
+        };
+        img.src = url;
+    });
+}
+
+/** 尝试将图片 URL 转换为 WebP Data URL；若遇跨域限制则保留原 URL */
+async function processCoverUrlToWebp(url: string, maxDim = 1080, quality = 0.92): Promise<string> {
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+    try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                try {
+                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                    const w = Math.max(1, Math.round(img.width * scale));
+                    const h = Math.max(1, Math.round(img.height * scale));
+                    const canvas = document.createElement("canvas");
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) { reject(new Error("Canvas context failed")); return; }
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const webp = canvas.toDataURL("image/webp", quality);
+                    resolve(webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", quality));
+                } catch (e) {
+                    reject(e);
+                }
+            };
+            img.onerror = reject;
+            img.src = trimmed;
+        });
+        return dataUrl;
+    } catch {
+        return trimmed;
+    }
+}
+
 function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack, categories, onToggleLike }: {
     tracks: MusicTrack[];
     player: MusicControlsValue;
@@ -1538,8 +1600,10 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
     const [editAlbum, setEditAlbum] = useState("");
     const [editLyrics, setEditLyrics] = useState("");
     const [editCover, setEditCover] = useState<string | undefined>(undefined);
+    const [editCoverUrlDraft, setEditCoverUrlDraft] = useState("");
     const [editCategory, setEditCategory] = useState<string | undefined>(undefined);
     const coverFileRef = useRef<HTMLInputElement>(null);
+    const lrcFileRef = useRef<HTMLInputElement>(null);
     const swipeRef = useRef<{ x: number; y: number } | null>(null);
 
     const startEditing = (t: MusicTrack, e: React.MouseEvent) => {
@@ -1550,17 +1614,49 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
         setEditAlbum(t.album || "");
         setEditLyrics(t.lyrics || "");
         setEditCover(t.coverUrl);
+        setEditCoverUrlDraft("");
         setEditCategory(t.category);
     };
 
     const handleCoverChange = async (files: FileList | null) => {
         if (!files || !files[0]) return;
         try {
-            // 高清原图无损优化：最大边 1080px，保持 0.95 高画质 JPEG
-            const dataUrl = await fileToCompressedDataUrl(files[0], 1080, 0.95);
+            // 采用高保真 WebP 格式压缩存储
+            const dataUrl = await fileToWebpDataUrl(files[0], 1080, 0.92);
             setEditCover(dataUrl);
         } catch { /* ignore */ }
         if (coverFileRef.current) coverFileRef.current.value = "";
+    };
+
+    const handleApplyCoverUrl = async () => {
+        const url = editCoverUrlDraft.trim();
+        if (!url) return;
+        const result = await processCoverUrlToWebp(url);
+        setEditCover(result);
+        setEditCoverUrlDraft("");
+    };
+
+    const handleLrcFileUpload = async (files: FileList | null) => {
+        const file = files?.[0];
+        if (!file) return;
+        try {
+            const buffer = await file.arrayBuffer();
+            let text = new TextDecoder("utf-8").decode(buffer);
+            // 乱码探测与回退 GBK
+            if (text.includes("\uFFFD")) {
+                try {
+                    text = new TextDecoder("gbk").decode(buffer);
+                } catch { /* ignore */ }
+            }
+            setEditLyrics(text);
+        } catch {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (typeof ev.target?.result === "string") setEditLyrics(ev.target.result);
+            };
+            reader.readAsText(file);
+        }
+        if (lrcFileRef.current) lrcFileRef.current.value = "";
     };
 
     const handleSaveEdit = () => {
@@ -1637,7 +1733,7 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                             <div className="music-settings-section" style={{ gap: 6 }}>
                                 <div className="music-settings-label">封面图片</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2 }}>
-                                    <div style={{ width: 48, height: 48, borderRadius: 10, overflow: 'hidden', background: 'var(--c-music-surface-solid)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <div style={{ width: 56, height: 56, borderRadius: 10, overflow: 'hidden', background: 'var(--c-music-surface-solid)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         {editCover ? <img src={editCover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, color: 'var(--c-music-accent)' }}>无封面</span>}
                                     </div>
                                     <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={e => handleCoverChange(e.target.files)} />
@@ -1663,6 +1759,24 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                                         </select>
                                     </div>
                                 </div>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                    <input
+                                        className="music-settings-input"
+                                        style={{ height: 32, fontSize: 'calc(11px*var(--app-text-scale,1))', flex: 1 }}
+                                        placeholder="或粘贴封面图片 URL"
+                                        value={editCoverUrlDraft}
+                                        onChange={e => setEditCoverUrlDraft(e.target.value)}
+                                        onKeyDown={e => e.key === "Enter" && void handleApplyCoverUrl()}
+                                    />
+                                    <button
+                                        className="music-settings-btn"
+                                        style={{ height: 32, padding: '0 12px', fontSize: 'calc(11px*var(--app-text-scale,1))', flexShrink: 0 }}
+                                        disabled={!editCoverUrlDraft.trim()}
+                                        onClick={() => void handleApplyCoverUrl()}
+                                    >
+                                        使用 URL
+                                    </button>
+                                </div>
                             </div>
                             <div className="music-settings-section" style={{ gap: 4 }}>
                                 <div className="music-settings-label">歌曲名</div>
@@ -1677,8 +1791,19 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                                 <input className="music-settings-input" style={{ height: 34 }} value={editAlbum} onChange={e => setEditAlbum(e.target.value)} placeholder="输入专辑名" />
                             </div>
                             <div className="music-settings-section" style={{ gap: 4 }}>
-                                <div className="music-settings-label">歌词（支持 LRC 格式或纯文本）</div>
-                                <div className="music-settings-hint" style={{ fontSize: 'calc(9px*var(--app-text-scale,1))' }}>粘贴形如 [00:12.34]歌词内容 的 LRC 歌词可实现滚动同步</div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div className="music-settings-label">歌词（支持 LRC 格式或纯文本）</div>
+                                    <input ref={lrcFileRef} type="file" accept=".lrc,.txt,text/plain" hidden onChange={e => handleLrcFileUpload(e.target.files)} />
+                                    <button
+                                        type="button"
+                                        className="music-settings-btn"
+                                        style={{ height: 26, padding: '0 10px', fontSize: 'calc(10.5px*var(--app-text-scale,1))' }}
+                                        onClick={() => lrcFileRef.current?.click()}
+                                    >
+                                        导入 LRC 文件
+                                    </button>
+                                </div>
+                                <div className="music-settings-hint" style={{ fontSize: 'calc(9px*var(--app-text-scale,1))' }}>支持导入本地 .lrc 文件或粘贴歌词，形如 [00:12.34]歌词内容 可滚动同步</div>
                                 <textarea
                                     className="music-settings-input"
                                     style={{ height: 96, resize: 'vertical', fontFamily: 'monospace', fontSize: 'calc(11.5px*var(--app-text-scale,1))', lineHeight: 1.45, whiteSpace: 'pre-wrap', padding: '8px 10px' }}
