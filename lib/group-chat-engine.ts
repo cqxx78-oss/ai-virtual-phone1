@@ -82,7 +82,7 @@ import { getPromptTimestampOptionsForTimeContext } from "./prompt-time";
 
 function stripGroupFinancialActionsForMetadataRepair(text: string): string {
     return stripStateAndInnerForPrompt(text)
-        .replace(/\[[^\]\n]+领取了[^\]\n]+的红包\]/g, "")
+        .replace(/\[[^\]\n]+领取了[^\]\n]+的红包(?:[，,][^\]\n]*)?\]/g, "")
         .replace(/\[[^\]\n]+退回了[^\]\n]+的红包\]/g, "")
         .replace(/\[[^\]\n]+(?:接受|领取)了[^\]\n]+的转账\]/g, "")
         .replace(/\[[^\]\n]+(?:拒收|退回)了[^\]\n]+的转账\]/g, "")
