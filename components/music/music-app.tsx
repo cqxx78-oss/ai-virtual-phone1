@@ -1640,6 +1640,57 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
         setEditCoverUrlDraft("");
     };
 
+    /** 将原始 LRC 文本标准化为逐行格式：一行一个时间戳 + 对应一句歌词 */
+    const formatLrcToLines = (rawLrc: string): string => {
+        if (!rawLrc.trim()) return "";
+        const timeTagRegex = /\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
+        const rawLines = rawLrc.split(/\r?\n/);
+        const parsedItems: { tag: string; time: number; text: string }[] = [];
+        let foundTimeTags = false;
+
+        for (const line of rawLines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            // 滤除 meta 标签（如 [ti:歌曲名], [ar:歌手], [al:专辑], [by:制作] 等）
+            if (/^\[[a-zA-Z]+:/.test(trimmed)) continue;
+
+            const matches = [...trimmed.matchAll(timeTagRegex)];
+            if (matches.length > 0) {
+                foundTimeTags = true;
+                for (let i = 0; i < matches.length; i++) {
+                    const m = matches[i];
+                    const startPos = (m.index ?? 0) + m[0].length;
+                    const endPos = i + 1 < matches.length ? (matches[i + 1].index ?? trimmed.length) : trimmed.length;
+                    const snippet = trimmed.slice(startPos, endPos).trim();
+
+                    const mins = parseInt(m[1], 10);
+                    const secs = parseInt(m[2], 10);
+                    const msStr = m[3] || "0";
+                    const ms = parseFloat(`0.${msStr}`);
+                    const time = mins * 60 + secs + ms;
+
+                    // 保留完整时间标签，如 [00:12.34]
+                    parsedItems.push({ tag: m[0], time, text: snippet });
+                }
+            }
+        }
+
+        if (!foundTimeTags) {
+            // 没有时间戳的纯文本歌词，清理空行后按原本分行返回
+            return rawLines.map(l => l.trim()).filter(Boolean).join("\n");
+        }
+
+        // 按时间先后排序
+        parsedItems.sort((a, b) => a.time - b.time);
+
+        // 生成规范的「[mm:ss.xx] 歌词内容」，过滤掉末尾纯占位无字行
+        const resultLines = parsedItems
+            .filter(item => item.text)
+            .map(item => `${item.tag} ${item.text}`);
+
+        return resultLines.join("\n");
+    };
+
     const handleLrcFileUpload = async (files: FileList | null) => {
         const file = files?.[0];
         if (!file) return;
@@ -1652,11 +1703,11 @@ function SongList({ tracks, player, formatTime, onDelete, onPlay, onUpdateTrack,
                     text = new TextDecoder("gbk").decode(buffer);
                 } catch { /* ignore */ }
             }
-            setEditLyrics(text);
+            setEditLyrics(formatLrcToLines(text));
         } catch {
             const reader = new FileReader();
             reader.onload = (ev) => {
-                if (typeof ev.target?.result === "string") setEditLyrics(ev.target.result);
+                if (typeof ev.target?.result === "string") setEditLyrics(formatLrcToLines(ev.target.result));
             };
             reader.readAsText(file);
         }
