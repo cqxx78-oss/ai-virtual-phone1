@@ -252,22 +252,45 @@ export default function MusicPlayer() {
 
     useEffect(() => {
         const lrc = player.currentTrack?.lyrics || "";
-        if (!lrc) {
+        if (!lrc.trim()) {
             parsedLyrics.current = [];
             return;
         }
         const lines: { time: number; text: string }[] = [];
-        for (const line of lrc.split("\n")) {
-            const match = line.match(/\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
-            if (match) {
-                const mins = parseInt(match[1], 10);
-                const secs = parseFloat(match[2]);
-                lines.push({ time: mins * 60 + secs, text: match[3].trim() });
+        const rawLines = lrc.split(/\r?\n/);
+        let hasTimeTags = false;
+
+        for (const line of rawLines) {
+            // 支持多个时间标签或毫秒格式 [00:12.34] 或 [00:12:34] 或 [00:12.340]
+            const matches = [...line.matchAll(/\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g)];
+            if (matches.length > 0) {
+                hasTimeTags = true;
+                const text = line.replace(/\[\d{1,2}:\d{1,2}(?:[.:]\d{1,3})?\]/g, "").trim();
+                for (const match of matches) {
+                    const mins = parseInt(match[1], 10);
+                    const secs = parseInt(match[2], 10);
+                    const msStr = match[3] || "0";
+                    const ms = parseFloat(`0.${msStr}`);
+                    lines.push({ time: mins * 60 + secs + ms, text });
+                }
             }
         }
+
+        // 如果用户导入的是纯文本歌词（没有带时间戳标签），按行均匀分配进度显示，避免出现"暂无歌词"
+        if (!hasTimeTags) {
+            const cleanLines = rawLines.map(l => l.trim()).filter(Boolean);
+            if (cleanLines.length > 0) {
+                const totalDuration = player.duration > 0 ? player.duration : (player.currentTrack?.duration || 180);
+                const step = totalDuration / cleanLines.length;
+                cleanLines.forEach((text, i) => {
+                    lines.push({ time: i * step, text });
+                });
+            }
+        }
+
         lines.sort((a, b) => a.time - b.time);
         parsedLyrics.current = lines;
-    }, [player.currentTrack?.lyrics]);
+    }, [player.currentTrack?.lyrics, player.duration, player.currentTrack?.duration]);
 
     useEffect(() => {
         const lyrics = parsedLyrics.current;

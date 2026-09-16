@@ -27,6 +27,7 @@ export type MusicState = {
 export type MusicActions = {
     playTrack: (track: MusicTrack) => void;
     playUrl: (url: string, track: MusicTrack) => void; // play from URL (online streams)
+    updateCurrentTrackMeta: (updates: Partial<MusicTrack>) => void;
     pause: () => void;
     resume: () => void;
     togglePlay: () => void;
@@ -264,6 +265,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         audio.play().catch(() => {});
     }, [cleanupBlobUrl]);
 
+    const updateCurrentTrackMeta = useCallback((updates: Partial<MusicTrack>) => {
+        setCurrentTrack(prev => (prev ? { ...prev, ...updates } : null));
+    }, []);
+
     const pause = useCallback(() => {
         audioRef.current?.pause();
     }, []);
@@ -476,11 +481,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
     const controlsValue = useMemo<MusicControlsValue>(() => ({
         currentTrack, isPlaying, duration, playMode, queue, volume, showFullPlayer, floatDismissed,
-        playTrack, playUrl, pause, resume, togglePlay, next, prev, seek,
+        playTrack, playUrl, updateCurrentTrackMeta, pause, resume, togglePlay, next, prev, seek,
         setPlayMode, setQueue, removeFromQueue, setVolume, stop, dismissFloat, openFullPlayer, closeFullPlayer,
     }), [
         currentTrack, isPlaying, duration, playMode, queue, volume, showFullPlayer, floatDismissed,
-        playTrack, playUrl, pause, resume, togglePlay, next, prev, seek,
+        playTrack, playUrl, updateCurrentTrackMeta, pause, resume, togglePlay, next, prev, seek,
         setQueue, removeFromQueue, setVolume, stop, dismissFloat, openFullPlayer, closeFullPlayer,
     ]);
 

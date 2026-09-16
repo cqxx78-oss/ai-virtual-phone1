@@ -250,6 +250,10 @@ export default function MusicApp({ onClose }: Props) {
         if (player.queue.some(t => t.id === trackId)) {
             player.setQueue(player.queue.map(t => t.id === trackId ? { ...t, ...updates } : t));
         }
+        // 同步更新正在播放的歌曲元数据（使正在播放的歌词、封面立即可见）
+        if (player.currentTrack?.id === trackId) {
+            player.updateCurrentTrackMeta(updates);
+        }
     };
 
     const handleToggleLocalLike = async (trackId: string) => {
