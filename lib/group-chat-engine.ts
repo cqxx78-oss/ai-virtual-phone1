@@ -427,7 +427,8 @@ async function buildGroupChatPromptMessages(
         hint: buildChatPluginPromptFragments(session.id),
     });
     const pluginPromptHint = pluginPrompt.hint?.trim() ? `\n\n### 扩展插件\n${pluginPrompt.hint.trim()}\n` : "";
-    const customAppRichMediaDirectives = formatCustomAppChatDirectivesForPrompt({ group: true }) + buildScreenEffectPromptHint() + pluginPromptHint;
+    const redPacketRuleHint = "\n\n### 群红包互动规则\n- 当角色在本次回复中输出 [角色名领取了某人的红包] 动作时，该红包的真实金额尚未产生，将由系统在稍后随机分配并生成系统记录。\n- 严禁在当前这句发言中凭空捏造、宣称自己领到了具体金额数字（如不要说“我领了X元”、“才X元”），可以表达抢红包的动作、期待手气或调侃气氛；具体的金额请在后续对话中根据系统公布的真实记录再作讨论。\n";
+    const customAppRichMediaDirectives = formatCustomAppChatDirectivesForPrompt({ group: true }) + buildScreenEffectPromptHint() + pluginPromptHint + redPacketRuleHint;
     const toolsPrompt = usesNativeActions
         ? "需要动作时使用可用动作接口。"
         : formatToolsForPrompt(enabledTools);
