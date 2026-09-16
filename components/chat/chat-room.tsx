@@ -2561,6 +2561,11 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 if (attachHere) attachedState = true;
                 savedAnyPart = true;
                 msgsSetter(prev => [...prev, msg]);
+
+                // 角色在群聊发出多人/拼手气红包时，作为发红包者本人自动在第一轮参与领一份（无需等下一轮催领）
+                if (part.mediaType === "red_packet" && (part.mediaData?.count || 1) > 1) {
+                    handleGroupRedPacketAction("accept", r.characterName, r.characterName);
+                }
                 const body = msg.content.trim()
                     || (msg.mediaType === "media_file" && msg.mediaData?.fileType === "image" && msg.mediaData?.label
                         ? `发了一张照片: ${msg.mediaData.label}`
