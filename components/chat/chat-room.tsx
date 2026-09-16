@@ -2244,9 +2244,9 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 role: "assistant",
                 content: `${claimerName}领取了${ownerDisplay}的红包，金额:${share}元`,
                 mediaType: "accept_red_packet",
-                mediaData: { claimer: claimerName, owner: ownerDisplay },
+                mediaData: { claimer: claimerName, owner: ownerDisplay, amount: share },
                 senderName: claimerName,
-                ...buildAssistantActionEditMeta(`[${claimerName}领取了${ownerDisplay}的红包]`),
+                ...buildAssistantActionEditMeta(`[${claimerName}领取了${ownerDisplay}的红包，金额:${share}元]`),
             });
             setMessages(prev => [...prev, sysMsg]);
         } else {
