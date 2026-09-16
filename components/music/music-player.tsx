@@ -260,18 +260,35 @@ export default function MusicPlayer() {
         const rawLines = lrc.split(/\r?\n/);
         let hasTimeTags = false;
 
-        for (const line of rawLines) {
-            // 支持多个时间标签或毫秒格式 [00:12.34] 或 [00:12:34] 或 [00:12.340]
-            const matches = [...line.matchAll(/\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g)];
+        // 兼容单行内混排多个 [mm:ss.xx] 歌词片段，按每个时间戳切分成独立句子
+        const timeTagRegex = /\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
+
+        for (const rawLine of rawLines) {
+            const trimmed = rawLine.trim();
+            if (!trimmed) continue;
+            // 忽略 ID 标签如 [ti:歌曲名], [ar:歌手], [by:制作人] 等
+            if (/^\[[a-zA-Z]+:/.test(trimmed)) continue;
+
+            const matches = [...trimmed.matchAll(timeTagRegex)];
             if (matches.length > 0) {
                 hasTimeTags = true;
-                const text = line.replace(/\[\d{1,2}:\d{1,2}(?:[.:]\d{1,3})?\]/g, "").trim();
-                for (const match of matches) {
-                    const mins = parseInt(match[1], 10);
-                    const secs = parseInt(match[2], 10);
-                    const msStr = match[3] || "0";
+
+                // 判断是否是行内多时间戳段落拼接（如 [00:00.00] 作词 [00:00.80] 作曲）
+                for (let i = 0; i < matches.length; i++) {
+                    const m = matches[i];
+                    const startPos = (m.index ?? 0) + m[0].length;
+                    const endPos = i + 1 < matches.length ? (matches[i + 1].index ?? trimmed.length) : trimmed.length;
+                    const snippet = trimmed.slice(startPos, endPos).trim();
+
+                    const mins = parseInt(m[1], 10);
+                    const secs = parseInt(m[2], 10);
+                    const msStr = m[3] || "0";
                     const ms = parseFloat(`0.${msStr}`);
-                    lines.push({ time: mins * 60 + secs + ms, text });
+                    const time = mins * 60 + secs + ms;
+
+                    if (snippet) {
+                        lines.push({ time, text: snippet });
+                    }
                 }
             }
         }
