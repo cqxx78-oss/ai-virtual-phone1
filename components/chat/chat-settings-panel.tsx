@@ -17,12 +17,6 @@ import {
     removeChatContact,
     normalizeVisionImagePromptLimit,
     MAX_VISION_IMAGE_PROMPT_LIMIT,
-    resolveSessionBubbleTypingSpeed,
-    normalizeBubbleTypingSpeed,
-    calculateBubbleTypingDelayMs,
-    DEFAULT_BUBBLE_TYPING_SPEED,
-    INSTANT_BUBBLE_TYPING_SPEED,
-    type BubbleTypingSpeed,
     type ChatMessage,
 } from "@/lib/chat-storage";
 import {
@@ -393,28 +387,6 @@ export function ChatSettingsPanel({
         setShowStatusRegionDialog(true);
     };
     const [visionImagePromptLimit, setVisionImagePromptLimit] = useState(() => normalizeVisionImagePromptLimit(session.visionImagePromptLimit));
-    // 气泡发送节奏：null = 跟随默认（模拟真人打字）
-    const [bubbleSpeed, setBubbleSpeed] = useState<BubbleTypingSpeed | null>(
-        () => (session.bubbleTypingSpeed ? resolveSessionBubbleTypingSpeed(session) : null),
-    );
-    const [showBubbleSpeed, setShowBubbleSpeed] = useState(false);
-    const [bubbleSpeedDraft, setBubbleSpeedDraft] = useState<BubbleTypingSpeed>(
-        () => resolveSessionBubbleTypingSpeed(session),
-    );
-    const openBubbleSpeedDialog = () => {
-        setBubbleSpeedDraft(resolveSessionBubbleTypingSpeed(session));
-        setShowBubbleSpeed(true);
-    };
-    const saveBubbleSpeed = (next: BubbleTypingSpeed | null) => {
-        setBubbleSpeed(next);
-        updateSession({ bubbleTypingSpeed: next });
-        setShowBubbleSpeed(false);
-    };
-    const bubbleSpeedSummary = bubbleSpeed
-        ? (bubbleSpeed.maxMs <= 0
-            ? "瞬时（不等待）"
-            : `${(bubbleSpeed.baseMs / 1000).toFixed(1)}s 起步 · 每字 ${bubbleSpeed.perCharMs}ms`)
-        : "默认（模拟打字）";
     const [bilingualTranslationEnabled, setBilingualTranslationEnabled] = useState(session.bilingualTranslationEnabled !== false);
     const [collapseBilingualTranslation, setCollapseBilingualTranslation] = useState(session.collapseBilingualTranslation !== false);
     const [discardInvalidStickers, setDiscardInvalidStickers] = useState(session.discardInvalidStickers === true);
@@ -1266,17 +1238,6 @@ export function ChatSettingsPanel({
                 {/* Advanced */}
                 <div className="menu-group">
                     <KeyboardAutoSendDebounceItem sessionId={session.id} />
-                    <button className="menu-item" onClick={openBubbleSpeedDialog}>
-                        <ChatInfoIcon icon={Clock} color={BINDING_ACCENTS.voice} />
-                        <div className="menu-label-group">
-                            <span className="menu-label">气泡发送速度</span>
-                            <span className="menu-desc">模拟真人打字节奏，逐条气泡延迟发出</span>
-                        </div>
-                        <div className="menu-right">
-                            <span className="menu-desc mr-1">{bubbleSpeedSummary}</span>
-                            <ChevronRight size={16} />
-                        </div>
-                    </button>
                     <button className="menu-item" onClick={() => setEditingCSS(true)}>
                         <ChatInfoIcon icon={Code} color={BINDING_ACCENTS.embedding} />
                         <div className="menu-label-group"><span className="menu-label">自定义 CSS 样式</span></div>
@@ -1567,100 +1528,6 @@ export function ChatSettingsPanel({
                             </button>
                             <button onClick={saveBilingualPromptDraft} className="ui-btn ui-btn-success flex-1">
                                 保存
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal: 气泡发送速度 */}
-            {showBubbleSpeed && (
-                <div className="modal-overlay" onClick={() => setShowBubbleSpeed(false)}>
-                    <div className="modal-dialog" onClick={e => e.stopPropagation()}>
-                        <span className="modal-header-title">气泡发送速度</span>
-                        <p className="menu-desc text-center !mt-0">
-                            角色一次回复被拆成多条气泡时，逐条按此节奏延迟发出。仅影响显示，不影响上下文。
-                        </p>
-                        <div className="flex flex-col gap-2 w-full">
-                            {([
-                                { key: "instant", label: "瞬时", desc: "不等待，气泡一次全部发出", value: INSTANT_BUBBLE_TYPING_SPEED, followDefault: false },
-                                { key: "fast", label: "偏快", desc: "0.4 秒起步 · 每字 18ms", value: { baseMs: 400, perCharMs: 18, maxMs: 3000 }, followDefault: false },
-                                { key: "default", label: "默认（推荐）", desc: "0.8 秒起步 · 每字 35ms", value: DEFAULT_BUBBLE_TYPING_SPEED, followDefault: true },
-                                { key: "slow", label: "偏慢", desc: "1.5 秒起步 · 每字 70ms", value: { baseMs: 1500, perCharMs: 70, maxMs: 12000 }, followDefault: false },
-                            ] as Array<{ key: string; label: string; desc: string; value: BubbleTypingSpeed; followDefault: boolean }>).map(option => {
-                                const active = bubbleSpeedDraft.maxMs === option.value.maxMs
-                                    && bubbleSpeedDraft.baseMs === option.value.baseMs
-                                    && bubbleSpeedDraft.perCharMs === option.value.perCharMs;
-                                return (
-                                    <button
-                                        key={option.key}
-                                        type="button"
-                                        className={`ui-btn w-full flex-col ${active ? "ui-btn-primary" : "ui-btn-ghost"}`}
-                                        onClick={() => saveBubbleSpeed(option.followDefault ? null : { ...option.value })}
-                                    >
-                                        <span>{option.label}{active ? " ✓" : ""}</span>
-                                        <span className="ts-11 opacity-70">{option.desc}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <div className="w-full">
-                            <div className="menu-desc text-left">自定义：起步延迟 / 每字追加 / 单条上限（毫秒）</div>
-                            <div className="flex gap-2 mt-1.5">
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={60000}
-                                    value={bubbleSpeedDraft.baseMs}
-                                    onChange={e => setBubbleSpeedDraft(prev => ({ ...prev, baseMs: Number(e.target.value) || 0 }))}
-                                    className="ui-input flex-1 min-w-0 text-center"
-                                    placeholder="起步"
-                                />
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={5000}
-                                    value={bubbleSpeedDraft.perCharMs}
-                                    onChange={e => setBubbleSpeedDraft(prev => ({ ...prev, perCharMs: Number(e.target.value) || 0 }))}
-                                    className="ui-input flex-1 min-w-0 text-center"
-                                    placeholder="每字"
-                                />
-                                <input
-                                    type="number"
-                                    min={0}
-                                    max={300000}
-                                    value={bubbleSpeedDraft.maxMs}
-                                    onChange={e => setBubbleSpeedDraft(prev => ({ ...prev, maxMs: Number(e.target.value) || 0 }))}
-                                    className="ui-input flex-1 min-w-0 text-center"
-                                    placeholder="上限"
-                                />
-                            </div>
-                            <div className="menu-desc text-left mt-1.5">
-                                上限填 0 表示瞬时；示例：10 个字的气泡约等待{" "}
-                                {calculateBubbleTypingDelayMs("十个字的气泡示例内容", bubbleSpeedDraft)}ms
-                            </div>
-                        </div>
-                        <div className="flex gap-3 w-full">
-                            <button
-                                type="button"
-                                className="ui-btn ui-btn-ghost flex-1"
-                                onClick={() => setBubbleSpeedDraft({ ...DEFAULT_BUBBLE_TYPING_SPEED })}
-                            >
-                                恢复默认值
-                            </button>
-                            <button
-                                type="button"
-                                className="ui-btn ui-btn-outline flex-1"
-                                onClick={() => setShowBubbleSpeed(false)}
-                            >
-                                取消
-                            </button>
-                            <button
-                                type="button"
-                                className="ui-btn ui-btn-success flex-1"
-                                onClick={() => saveBubbleSpeed(normalizeBubbleTypingSpeed(bubbleSpeedDraft))}
-                            >
-                                应用
                             </button>
                         </div>
                     </div>

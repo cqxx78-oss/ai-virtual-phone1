@@ -8,7 +8,8 @@ import {
     getDefaultFollowUpConfig,
     resolveUserIdentity,
 } from "@/lib/settings-storage";
-import { loadChatAppSettings, saveChatAppSettings } from "@/lib/chat-storage";
+import { loadChatAppSettings, saveChatAppSettings, hasCustomBubbleTypingSpeed, loadBubbleTypingSpeed, BUBBLE_TYPING_SPEED_UPDATED_EVENT } from "@/lib/chat-storage";
+import { BubbleSpeedDialog, describeBubbleTypingSpeed } from "./bubble-speed-dialog";
 import type { UserIdentity } from "@/components/settings/user-identity";
 import { getApiLogs, clearApiLogs, type DebugInfo } from "@/lib/chat-engine";
 import type { FollowUpConfig } from "@/lib/settings-storage";
@@ -162,6 +163,8 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
     const [showPushSettings, setShowPushSettings] = useState(false);
     const [enterToSendEnabled, setEnterToSendEnabled] = useState(false);
     const [callVibrationEnabled, setCallVibrationEnabled] = useState(true);
+    const [showBubbleSpeed, setShowBubbleSpeed] = useState(false);
+    const [bubbleSpeedSummary, setBubbleSpeedSummary] = useState(() => describeBubbleTypingSpeed(loadBubbleTypingSpeed(), hasCustomBubbleTypingSpeed()));
     const [userStats, setUserStats] = useState({ chats: 0, moments: 0, visitors: 1234 });
     const [walletSummary, setWalletSummary] = useState(() => {
         const wallet = loadWalletState();
@@ -209,6 +212,15 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
         };
         window.addEventListener(WALLET_UPDATED_EVENT, syncWallet);
         return () => window.removeEventListener(WALLET_UPDATED_EVENT, syncWallet);
+    }, []);
+
+    // 全局气泡速度可能被别处改动（聊天室/设置弹窗），摘要跟着刷新
+    useEffect(() => {
+        const syncBubbleSpeed = () => {
+            setBubbleSpeedSummary(describeBubbleTypingSpeed(loadBubbleTypingSpeed(), hasCustomBubbleTypingSpeed()));
+        };
+        window.addEventListener(BUBBLE_TYPING_SPEED_UPDATED_EVENT, syncBubbleSpeed);
+        return () => window.removeEventListener(BUBBLE_TYPING_SPEED_UPDATED_EVENT, syncBubbleSpeed);
     }, []);
 
     const handleNotificationToggle = async (enabled: boolean) => {
@@ -446,7 +458,7 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
                             <Toggle checked={callVibrationEnabled} onChange={handleCallVibrationToggle} />
                         </div>
 
-                        <div className="flex items-center gap-3 py-3 w-full">
+                        <div className="flex items-center gap-3 py-3 w-full border-b border-[color-mix(in_srgb,var(--c-card-border)_20%,transparent)]">
                             <Bell size={18} className="text-[var(--c-icon)] opacity-70" strokeWidth={1.25}/>
                             <div className="flex flex-col flex-1 text-left gap-0.5">
                                 <span className="ts-14 font-semibold text-[var(--c-text-title)]">浏览器后台通知</span>
@@ -454,6 +466,16 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
                             </div>
                             <Toggle checked={notifEnabled} disabled={notifChecking} onChange={handleNotificationToggle} />
                         </div>
+
+                        <button className="flex items-center gap-3 py-3.5 w-full" onClick={() => { window.dispatchEvent(new CustomEvent("chat-hide-tabbar", { detail: true })); setShowBubbleSpeed(true); }}>
+                            <Clock size={18} className="text-[var(--c-icon)] opacity-70" strokeWidth={1.25}/>
+                            <div className="flex flex-col flex-1 text-left gap-0.5">
+                                <span className="ts-14 font-semibold text-[var(--c-text-title)]">气泡发送速度</span>
+                                <span className="ts-11 text-[var(--c-text)] opacity-70">模拟真人打字节奏，逐条气泡延迟发出（全局生效）</span>
+                            </div>
+                            <span className="ts-11 text-[var(--c-text)] opacity-60 shrink-0">{bubbleSpeedSummary}</span>
+                            <ChevronRight size={16} className="text-[var(--c-icon)] opacity-50" />
+                        </button>
                     </div>
 
                     {/* 高级工具 */}
@@ -479,6 +501,13 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
                     </div>
                 </div>
             </PageShell>
+
+            {showBubbleSpeed && (
+                <BubbleSpeedDialog onClose={() => {
+                    setShowBubbleSpeed(false);
+                    window.dispatchEvent(new CustomEvent("chat-hide-tabbar", { detail: false }));
+                }} />
+            )}
         </>
     );
 }

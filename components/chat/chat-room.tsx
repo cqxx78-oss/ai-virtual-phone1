@@ -84,7 +84,7 @@ import {
     rollChatDiceFace,
 } from "@/lib/chat-screen-effects";
 import { abortableDelay, throwIfAborted } from "@/lib/abort-utils";
-import { calculateBubbleTypingDelayMs, resolveSessionBubbleTypingSpeed, type BubbleTypingSpeed } from "@/lib/chat-storage";
+import { calculateBubbleTypingDelayMs, loadBubbleTypingSpeed, type BubbleTypingSpeed } from "@/lib/chat-storage";
 import { GROUP_SELF_KEY, canGroupAdminAct, applyGroupAdminAction, buildGroupAdminNoticeText, getGroupMemberDisplayName, getGroupMuteRemainingMs, getGroupRole, isGroupMuted, formatMuteRemainingLabel, resolveGroupMemberKeyByName, type GroupAdminAction } from "@/lib/group-admin";
 import { extractTextToolDirectiveText } from "@/lib/text-tool-protocol";
 import { emitChatPluginEvent, getChatPluginHookBus, runChatPluginTransform } from "@/lib/chat-plugin-hooks";
@@ -2478,7 +2478,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                     continue;
                 }
                 if (part.mediaType === "group_admin_notice") {
-                    if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content, resolveSessionBubbleTypingSpeed(session)), guard?.signal);
+                    if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content, loadBubbleTypingSpeed()), guard?.signal);
                     throwIfGenerationStopped(guard);
                     const applied = applyAIGroupAdminAction(r.characterId, part.mediaData);
                     if (!applied) continue; // 无权限/名字不合法：整个标签静默丢弃
@@ -2506,7 +2506,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 if (part.mediaType === "poke") {
                     const pokeSender = (part.mediaData?.pokeSender === "我" ? r.characterName : part.mediaData?.pokeSender) || r.characterName;
                     const pokeTarget = part.mediaData?.pokeTarget || "某人";
-                    if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content, resolveSessionBubbleTypingSpeed(session)), guard?.signal);
+                    if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content, loadBubbleTypingSpeed()), guard?.signal);
                     throwIfGenerationStopped(guard);
                     isFirst = false;
                     const msg = pushChatMessage({
@@ -2532,7 +2532,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                     });
                     continue;
                 }
-                if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content, resolveSessionBubbleTypingSpeed(session)), guard?.signal);
+                if (!isFirst) await abortableDelay(calculateBubbleTypingDelay(part.content, loadBubbleTypingSpeed()), guard?.signal);
                 throwIfGenerationStopped(guard);
                 isFirst = false;
                 const attachHere = !attachedState && canCarryFoldedPanel(part);
@@ -2991,7 +2991,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
         } else {
             publishVisibleMessage(messageDrafts[0]);
             for (let i = 1; i < messageDrafts.length; i++) {
-                const delayMs = calculateBubbleTypingDelay(messageDrafts[i]?.draft?.content, resolveSessionBubbleTypingSpeed(session));
+                const delayMs = calculateBubbleTypingDelay(messageDrafts[i]?.draft?.content, loadBubbleTypingSpeed());
                 await abortableDelay(delayMs, options?.signal);
                 throwIfGenerationStopped(options);
                 publishVisibleMessage(messageDrafts[i]);

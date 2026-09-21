@@ -16,6 +16,9 @@ import {
     updateMessageMediaData,
     createResponseBatchId,
     getLatestCharacterStateValues,
+    calculateBubbleTypingDelayMs,
+    hasCustomBubbleTypingSpeed,
+    loadBubbleTypingSpeed,
 } from "./chat-storage";
 import type { ChatMessage, StateValue } from "./chat-storage";
 import { generateChatCompletion, flattenCompletionResult } from "./chat-engine";
@@ -266,9 +269,16 @@ function delay(ms: number): Promise<void> {
     return new Promise<void>(resolve => { bgSetTimeout(resolve, ms); });
 }
 
+/** 逐条弹出间隔：用户自定义过全局气泡速度就按内容算，否则沿用原来的固定 800ms */
+function resolveBackgroundStaggerMs(content: string | undefined, customized: boolean): number {
+    if (!customized) return BACKGROUND_MESSAGE_STAGGER_MS;
+    return calculateBubbleTypingDelayMs(content, loadBubbleTypingSpeed());
+}
+
 async function dispatchBackgroundMessagesOneByOne(sessionId: string, messages: ChatMessage[], immediate = false) {
+    const customized = hasCustomBubbleTypingSpeed();
     for (let index = 0; index < messages.length; index += 1) {
-        if (index > 0 && !immediate) await delay(BACKGROUND_MESSAGE_STAGGER_MS);
+        if (index > 0 && !immediate) await delay(resolveBackgroundStaggerMs(messages[index]?.content, customized));
         window.dispatchEvent(new CustomEvent("followup-message-saved", {
             detail: { sessionId, message: messages[index] },
         }));
@@ -1017,7 +1027,8 @@ export async function parseAndSaveResponse(
     }
 
     // 与聊天室前台切后台时同节奏的双通道提醒：横幅 + 系统弹窗成对、
-    // 按 800ms 逐条发（与气泡逐条弹出同拍；Worker 定时器保证后台锁屏也按节奏到达）
+    // 逐条按全局气泡发送速度发（未自定义时即原来的固定 800ms；
+    // Worker 定时器保证后台锁屏也按节奏到达）
     // 静默模式（回端合并）不再重复提醒——系统推送已经弹过了
     if (filteredParts.length > 0 && options?.silent !== true) {
         const isGroup = sess?.isGroup === true;
@@ -1030,7 +1041,10 @@ export async function parseAndSaveResponse(
         const partBody = (part: ParsedMessagePart) => bodyPrefix + ((part.content || "").trim()
             || (part.mediaType === "image" && part.mediaData?.label ? `发了一张照片: ${part.mediaData.label}` : "发来一条消息"));
         const { sendBrowserNotification } = await import("./browser-notification");
+        let noticeDelayMs = 0;
         filteredParts.forEach((part, index) => {
+            if (index > 0) noticeDelayMs += resolveBackgroundStaggerMs(part.content, hasCustomBubbleTypingSpeed());
+            const delayForThisPart = noticeDelayMs;
             bgSetTimeout(() => {
                 dispatchChatMessageNotice({
                     sessionId,
@@ -1040,7 +1054,7 @@ export async function parseAndSaveResponse(
                     ...(isGroup ? { isGroup: true } : {}),
                 });
                 sendBrowserNotification(charName, { body: partBody(part).slice(0, 60), icon: avatar || undefined });
-            }, index * BACKGROUND_MESSAGE_STAGGER_MS);
+            }, delayForThisPart);
         });
     }
 

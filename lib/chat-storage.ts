@@ -9,7 +9,7 @@ import {
 } from "./chat-db";
 import { resolveUserIdentity } from "./settings-storage";
 import { loadCharacters } from "./character-storage";
-import { kvGet, kvSet, registerKvMigration } from "./kv-db";
+import { kvGet, kvSet, kvRemove, registerKvMigration } from "./kv-db";
 import { emitChatPluginEvent, runChatPluginTransformSync } from "./chat-plugin-hooks";
 import { parseAIResponse } from "./rich-message-parser";
 import { extractTextToolDirectiveText } from "./text-tool-protocol";
@@ -55,14 +55,34 @@ export function normalizeBubbleTypingSpeed(value: unknown): BubbleTypingSpeed {
     };
 }
 
-/** 会话生效的速度配置：未设置时用默认节奏 */
-export function resolveSessionBubbleTypingSpeed(
-    session?: Pick<ChatSession, "bubbleTypingSpeed"> | null,
-): BubbleTypingSpeed {
-    if (!session || session.bubbleTypingSpeed === undefined || session.bubbleTypingSpeed === null) {
+/** 全局气泡速度配置的存储 key（聊天 APP 级设置，对所有会话生效） */
+const BUBBLE_SPEED_KEY = "ai_phone_bubble_typing_speed_v1";
+registerKvMigration(BUBBLE_SPEED_KEY);
+
+/** 读取全局气泡速度：未设置时用默认节奏（模拟真人打字） */
+export function loadBubbleTypingSpeed(): BubbleTypingSpeed {
+    if (typeof window === "undefined") return { ...DEFAULT_BUBBLE_TYPING_SPEED };
+    try {
+        const raw = kvGet(BUBBLE_SPEED_KEY);
+        if (!raw) return { ...DEFAULT_BUBBLE_TYPING_SPEED };
+        return normalizeBubbleTypingSpeed(JSON.parse(raw));
+    } catch {
         return { ...DEFAULT_BUBBLE_TYPING_SPEED };
     }
-    return normalizeBubbleTypingSpeed(session.bubbleTypingSpeed);
+}
+
+/** 写入全局气泡速度（null = 恢复默认节奏），并广播给已挂载的聊天室 */
+export function saveBubbleTypingSpeed(speed: BubbleTypingSpeed | null): void {
+    if (typeof window === "undefined") return;
+    if (speed === null) kvRemove(BUBBLE_SPEED_KEY);
+    else kvSet(BUBBLE_SPEED_KEY, JSON.stringify(normalizeBubbleTypingSpeed(speed)));
+    window.dispatchEvent(new CustomEvent(BUBBLE_TYPING_SPEED_UPDATED_EVENT));
+}
+
+/** 判断是否已自定义过全局气泡速度（false = 走默认节奏） */
+export function hasCustomBubbleTypingSpeed(): boolean {
+    if (typeof window === "undefined") return false;
+    return Boolean(kvGet(BUBBLE_SPEED_KEY));
 }
 
 /** 计算一条气泡的等待时长：base + 字数 × perChar，夹在 [base, max] 之间；maxMs=0 表示瞬时 */
@@ -104,8 +124,6 @@ export type ChatSession = {
     offlineBilingualTranslationPrompt?: string;
     nativeExpandedToolSourceIds?: string[];
     visionImagePromptLimit?: number;
-    /** 角色气泡发送节奏（模拟真人打字）；未设置 = 默认节奏 */
-    bubbleTypingSpeed?: BubbleTypingSpeed | null;
     // Group chat fields
     isGroup?: boolean;
     groupName?: string;
@@ -319,6 +337,8 @@ export function getMaxToolRounds(): number {
 }
 
 export const CHAT_APP_SETTINGS_UPDATED_EVENT = "chat-app-settings-updated";
+/** 全局气泡发送速度变更：已挂载的聊天室监听后立即生效（无需重开） */
+export const BUBBLE_TYPING_SPEED_UPDATED_EVENT = "chat-bubble-typing-speed-updated";
 export const CHAT_MESSAGE_PUSHED_EVENT = "chat-message-pushed";
 export const CHAT_MESSAGES_DELETED_EVENT = "chat-messages-deleted";
 export const CHAT_REQUEST_REPLY_EVENT = "chat-request-reply";
