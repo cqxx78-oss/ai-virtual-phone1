@@ -15,14 +15,23 @@ function initGlobalPopStateListener() {
   if (typeof window === "undefined" || initialized) return;
   initialized = true;
 
-  // 桌面初始化时，向浏览器压入一个根底帧，用于捕获在桌面上按返回键的行为，防止直接退出 PWA
+  // 桌面初始化时，向浏览器压入一个根底帧（nav: 0），用于捕获在桌面上按返回键的行为，防止直接退出 PWA
   try {
-    window.history.pushState({ __isDesktopRoot: true }, "");
+    window.history.replaceState({ nav: 0, __isDesktopRoot: true }, "");
+    window.history.pushState({ nav: 0, __isDesktopRoot: true }, "");
   } catch {}
 
   window.addEventListener("popstate", (event) => {
-    if (stack.length > 0) {
-      // 导航栈中有层级：按顺序正常出栈回退上一层（聊天室→列表、子页面→主页、应用→桌面等）
+    // 读取浏览器历史当前的目标深度；没有状态或根层时目标深度为 0
+    let targetDepth = typeof event.state?.nav === "number" ? event.state.nav : 0;
+
+    // 前进场景钳制：若用户按了浏览器前进键，不盲目扩张栈，保证安全不越界
+    if (targetDepth > stack.length) {
+      targetDepth = stack.length;
+    }
+
+    // 目标深度收敛：只要当前栈深大于目标深度，依次平稳出栈回退，根除跳级与多级错位
+    while (stack.length > targetDepth) {
       const top = stack.pop();
       if (top) {
         try {
@@ -31,11 +40,12 @@ function initGlobalPopStateListener() {
           console.error("[NavStack] Error in onPop handler:", err);
         }
       }
-    } else {
-      // 栈已空（当前已经在小手机桌面上）：
-      // 重新推入底帧保持在当前页，并触发退出确认弹窗，防止误触直接退出 PWA
+    }
+
+    // 栈已完全清空（已位于桌面根层），触发桌面防退出确认拦截
+    if (stack.length === 0 && targetDepth === 0) {
       try {
-        window.history.pushState({ __isDesktopRoot: true }, "");
+        window.history.pushState({ nav: 0, __isDesktopRoot: true }, "");
       } catch {}
       if (desktopExitHandler) {
         desktopExitHandler();
@@ -69,8 +79,9 @@ export function pushNav(onPop: () => void, tag?: string): () => void {
   const entry: NavEntry = { id: entryId, tag, onPop };
   stack.push(entry);
 
+  // 压入当前层级深度 nav，供 popstate 定深同步与防漂移对齐
   try {
-    window.history.pushState({ __navId: entryId, tag }, "");
+    window.history.pushState({ nav: stack.length, __navId: entryId, tag }, "");
   } catch {}
 
   return () => {
