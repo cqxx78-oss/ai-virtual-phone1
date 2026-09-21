@@ -26,6 +26,53 @@ export function normalizeVisionImagePromptLimit(value: unknown): number {
     return Math.max(0, Math.min(MAX_VISION_IMAGE_PROMPT_LIMIT, Math.floor(parsed)));
 }
 
+/** 角色气泡发送节奏：baseMs=起步延迟，perCharMs=每字追加，maxMs=单条上限（模拟真人打字） */
+export type BubbleTypingSpeed = {
+    baseMs: number;
+    perCharMs: number;
+    maxMs: number;
+};
+
+/** 默认节奏：0.8 秒起步 + 每字 35ms，单条最长 6.5 秒 */
+export const DEFAULT_BUBBLE_TYPING_SPEED: BubbleTypingSpeed = { baseMs: 800, perCharMs: 35, maxMs: 6500 };
+/** 瞬时：不等待，气泡一次性全部发出 */
+export const INSTANT_BUBBLE_TYPING_SPEED: BubbleTypingSpeed = { baseMs: 0, perCharMs: 0, maxMs: 0 };
+
+function clampSpeedValue(value: unknown, fallback: number, min: number, max: number): number {
+    const parsed = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(min, Math.min(max, Math.round(parsed)));
+}
+
+/** 归一化气泡速度配置（缺字段回落到默认值；0/0/0 表示瞬时） */
+export function normalizeBubbleTypingSpeed(value: unknown): BubbleTypingSpeed {
+    if (!value || typeof value !== "object") return { ...DEFAULT_BUBBLE_TYPING_SPEED };
+    const raw = value as Partial<BubbleTypingSpeed>;
+    return {
+        baseMs: clampSpeedValue(raw.baseMs, DEFAULT_BUBBLE_TYPING_SPEED.baseMs, 0, 60000),
+        perCharMs: clampSpeedValue(raw.perCharMs, DEFAULT_BUBBLE_TYPING_SPEED.perCharMs, 0, 5000),
+        maxMs: clampSpeedValue(raw.maxMs, DEFAULT_BUBBLE_TYPING_SPEED.maxMs, 0, 300000),
+    };
+}
+
+/** 会话生效的速度配置：未设置时用默认节奏 */
+export function resolveSessionBubbleTypingSpeed(
+    session?: Pick<ChatSession, "bubbleTypingSpeed"> | null,
+): BubbleTypingSpeed {
+    if (!session || session.bubbleTypingSpeed === undefined || session.bubbleTypingSpeed === null) {
+        return { ...DEFAULT_BUBBLE_TYPING_SPEED };
+    }
+    return normalizeBubbleTypingSpeed(session.bubbleTypingSpeed);
+}
+
+/** 计算一条气泡的等待时长：base + 字数 × perChar，夹在 [base, max] 之间；maxMs=0 表示瞬时 */
+export function calculateBubbleTypingDelayMs(content: string | undefined, speed?: BubbleTypingSpeed | null): number {
+    const cfg = speed ? normalizeBubbleTypingSpeed(speed) : DEFAULT_BUBBLE_TYPING_SPEED;
+    if (cfg.maxMs <= 0) return 0;
+    const charCount = (content || "").trim().length;
+    return Math.min(Math.max(cfg.baseMs, cfg.baseMs + charCount * cfg.perCharMs), cfg.maxMs);
+}
+
 export type ChatContact = {
     id: string; // unique contact id
     characterId: string; // links to global character in character-storage.ts
@@ -57,6 +104,8 @@ export type ChatSession = {
     offlineBilingualTranslationPrompt?: string;
     nativeExpandedToolSourceIds?: string[];
     visionImagePromptLimit?: number;
+    /** 角色气泡发送节奏（模拟真人打字）；未设置 = 默认节奏 */
+    bubbleTypingSpeed?: BubbleTypingSpeed | null;
     // Group chat fields
     isGroup?: boolean;
     groupName?: string;
