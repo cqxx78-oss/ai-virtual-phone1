@@ -450,12 +450,6 @@ export function ChatSettingsPanel({
     }, [showScreenEffects]);
 
     useEffect(() => {
-        if (showBubbleSpeed) {
-            return pushNav(() => setShowBubbleSpeed(false), "chatSettings:bubbleSpeed");
-        }
-    }, [showBubbleSpeed]);
-
-    useEffect(() => {
         if (showBgActionSheet) {
             return pushNav(() => setShowBgActionSheet(false), "chatSettings:bgAction");
         }
