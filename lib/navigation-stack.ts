@@ -30,6 +30,8 @@ function initGlobalPopStateListener() {
       targetDepth = stack.length;
     }
 
+    const initialStackLength = stack.length;
+
     // 目标深度收敛：只要当前栈深大于目标深度，依次平稳出栈回退，根除跳级与多级错位
     while (stack.length > targetDepth) {
       const top = stack.pop();
@@ -42,8 +44,9 @@ function initGlobalPopStateListener() {
       }
     }
 
-    // 栈已完全清空（已位于桌面根层），触发桌面防退出确认拦截
-    if (stack.length === 0 && targetDepth === 0) {
+    // 只有在【按键前本身就已经在桌面根层】时按返回，才触发退出确认；
+    // 如果刚才执行了出栈（刚从 App 退回桌面），绝不弹窗误触。
+    if (initialStackLength === 0 && stack.length === 0 && targetDepth === 0) {
       try {
         window.history.pushState({ nav: 0, __isDesktopRoot: true }, "");
       } catch {}
