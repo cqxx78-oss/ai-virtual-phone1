@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
+import { pushNav } from "@/lib/navigation-stack";
 import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Search, Trash2, X, Check, Settings2, ArrowUp, ArrowDown, Edit3 } from "lucide-react";
 import { SettingsContext } from "./settings-context";
 import type { ApiConfig } from "@/lib/settings-types";
@@ -71,6 +72,16 @@ export function ApiSettings() {
         }
         setIsLoaded(true);
     }, []);
+
+    // 弹出 API 编辑/新增弹窗时，向全局导航栈压入一层，让返回键精准关闭弹窗而不是穿透退出
+    useEffect(() => {
+        if (editingId) {
+            return pushNav(() => {
+                setIsNewConfig(false);
+                setEditingId(null);
+            }, `api:edit:${editingId}`);
+        }
+    }, [editingId]);
 
     const persist = useCallback((newConfigs: ApiConfig[]) => {
         setConfigs(newConfigs);

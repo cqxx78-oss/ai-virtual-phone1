@@ -10,6 +10,7 @@ let nextId = 1;
 const stack: NavEntry[] = [];
 let initialized = false;
 let desktopExitHandler: (() => void) | null = null;
+let pendingProgrammaticPops = 0;
 
 function initGlobalPopStateListener() {
   if (typeof window === "undefined" || initialized) return;
@@ -22,6 +23,12 @@ function initGlobalPopStateListener() {
   } catch {}
 
   window.addEventListener("popstate", (event) => {
+    // 如果是程序主动 popNav() 引起的历史回退，直接消耗配额，不再重复触发页面回退
+    if (pendingProgrammaticPops > 0) {
+      pendingProgrammaticPops--;
+      return;
+    }
+
     // 读取浏览器历史当前的目标深度；没有状态或根层时目标深度为 0
     let targetDepth = typeof event.state?.nav === "number" ? event.state.nav : 0;
 
@@ -90,18 +97,39 @@ export function pushNav(onPop: () => void, tag?: string): () => void {
   return () => {
     const idx = stack.findIndex(e => e.id === entryId);
     if (idx !== -1) {
+      const isTop = idx === stack.length - 1;
       stack.splice(idx, 1);
+      // 若组件因内部其他交互直接卸载且当前位于栈顶，顺便将浏览器的冗余死帧撤回，杜绝死帧堆积
+      if (isTop) {
+        pendingProgrammaticPops++;
+        try {
+          window.history.back();
+        } catch {}
+      }
     }
   };
 }
 
 /**
  * 主动回退一层：供屏幕左上角的 UI 返回按钮统一调用。
+ * 核心优化：立刻同步执行栈顶的 onPop() 保证界面 100% 毫秒级秒退，
+ * 同时向浏览器发出 history.back() 抹平浏览器历史记录，杜绝“点好几下没反应”。
  */
 export function popNav(): void {
   if (typeof window === "undefined") return;
   if (stack.length > 0) {
-    window.history.back();
+    const top = stack.pop();
+    if (top) {
+      try {
+        top.onPop();
+      } catch (err) {
+        console.error("[NavStack] Error in immediate onPop handler:", err);
+      }
+    }
+    pendingProgrammaticPops++;
+    try {
+      window.history.back();
+    } catch {}
   }
 }
 
