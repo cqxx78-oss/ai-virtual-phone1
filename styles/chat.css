@@ -126,12 +126,9 @@
 }
 
 
-/* Scroll anchoring: keep scroll pinned to bottom when images/media load */
-.chat-scroll-anchored > *:not(:last-child) {
-  overflow-anchor: none;
-}
-
+/* Scroll anchoring: preserve browser native anchor pinning for all chat bubbles */
 .chat-scroll-anchored {
+  overflow-anchor: auto;
 }
 
 @supports (-webkit-touch-callout: none) {

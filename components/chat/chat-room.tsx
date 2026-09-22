@@ -1810,6 +1810,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     const pendingSearchJumpRef = useRef<PendingMessageJump | null>(null);
     const searchJumpHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const chatTouchStartYRef = useRef<number | null>(null);
+    const isUserTouchingRef = useRef(false);
     const isNearBottomRef = useRef(true);
 
     const stopLoadMoreAnchorTracking = useCallback(() => {
@@ -2046,7 +2047,8 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 }
             }
         } else if (displayMessages.length > prevMsgCountRef.current && el) {
-            if (isNearBottomRef.current) {
+            // 用户在翻历史或手指按着屏幕浏览时，底部消息静默进入，严禁强行拉扯滚动条
+            if (isNearBottomRef.current && !isUserTouchingRef.current) {
                 el.scrollTop = el.scrollHeight;
             }
         }
@@ -5350,7 +5352,8 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
                     const targetEl = e.currentTarget;
                     const distanceFromBottom = targetEl.scrollHeight - targetEl.scrollTop - targetEl.clientHeight;
-                    isNearBottomRef.current = distanceFromBottom <= 80;
+                    // 精准判定：脱离底部 24px 即视为用户主动浏览历史，避免触碰时被强制拉底
+                    isNearBottomRef.current = distanceFromBottom <= 24;
                     if (!offlineMode && hasMore && targetEl.scrollTop <= 20) {
                         loadMore();
                     }
@@ -5367,11 +5370,13 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                     }
                 }}
                 onTouchStart={(e) => {
+                    isUserTouchingRef.current = true;
                     if (e.touches.length === 1) {
                         chatTouchStartYRef.current = e.touches[0].clientY;
                     }
                 }}
                 onTouchMove={(e) => {
+                    isUserTouchingRef.current = true;
                     if (!offlineMode && hasMore && chatTouchStartYRef.current !== null && e.touches.length === 1) {
                         const currentY = e.touches[0].clientY;
                         const deltaY = currentY - chatTouchStartYRef.current;
@@ -5382,9 +5387,11 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 }}
                 onTouchEnd={() => {
                     chatTouchStartYRef.current = null;
+                    isUserTouchingRef.current = false;
                 }}
                 onTouchCancel={() => {
                     chatTouchStartYRef.current = null;
+                    isUserTouchingRef.current = false;
                 }}
                 onPointerDown={(e) => {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
