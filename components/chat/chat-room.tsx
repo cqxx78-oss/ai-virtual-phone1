@@ -3790,8 +3790,17 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
 
     // 收起键盘（或关掉表情/加号面板）并安静 N 秒后自动触发回复，
     // 等价于替用户点一次「触发回复」。判定全在 hook 内部，配置关掉后与手动模式一致。
+    const isEditingAnyMessage = Boolean(
+        activeMessageId ||
+        activeOfflineTarget ||
+        editingMessageId ||
+        editingResponseBatchId ||
+        editingResponseRoundId ||
+        editingOfflineTarget
+    );
+
     useKeyboardDismissAutoSend(wrapperRef, {
-        active: !offlineMode && !isMultiSelectMode,
+        active: !offlineMode && !isMultiSelectMode && !isEditingAnyMessage,
         pending: pendingGenerate,
         generating: isGenerating,
         panelOpen: showEmojiPanel || showStickerPanel || showPlusMenu,
