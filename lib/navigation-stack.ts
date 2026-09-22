@@ -51,13 +51,15 @@ function initGlobalPopStateListener() {
       }
     }
 
-    // 只有在【按键前本身就已经在桌面根层】时按返回，才触发退出确认；
-    // 如果刚才执行了出栈（刚从 App 退回桌面），绝不弹窗误触。
-    if (initialStackLength === 0 && stack.length === 0 && targetDepth === 0) {
+    // 【桌面根层死锁】：只要栈已经清空（已经在桌面），无论怎么狂按返回键，
+    // 立刻向浏览器再推入一层哨兵底帧，将游标死死锁在当前网页内，绝不穿透闪退到手机系统桌面！
+    if (stack.length === 0) {
       try {
         window.history.pushState({ nav: 0, __isDesktopRoot: true }, "");
       } catch {}
-      if (desktopExitHandler) {
+
+      // 只有在【按键前本身就已经在桌面】时，才弹窗询问是否退出；刚从应用退回桌面时不弹窗
+      if (initialStackLength === 0 && desktopExitHandler) {
         desktopExitHandler();
       }
     }
