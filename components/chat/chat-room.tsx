@@ -1810,6 +1810,7 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
     const pendingSearchJumpRef = useRef<PendingMessageJump | null>(null);
     const searchJumpHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const chatTouchStartYRef = useRef<number | null>(null);
+    const isNearBottomRef = useRef(true);
 
     const stopLoadMoreAnchorTracking = useCallback(() => {
         loadMoreResizeObserverRef.current?.disconnect();
@@ -2045,7 +2046,9 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 }
             }
         } else if (displayMessages.length > prevMsgCountRef.current && el) {
-            el.scrollTop = el.scrollHeight;
+            if (isNearBottomRef.current) {
+                el.scrollTop = el.scrollHeight;
+            }
         }
         prevMsgCountRef.current = displayMessages.length;
 
@@ -5346,6 +5349,8 @@ export function ChatRoom({ session, onBack }: ChatRoomProps) {
                 onScroll={(e) => {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
                     const targetEl = e.currentTarget;
+                    const distanceFromBottom = targetEl.scrollHeight - targetEl.scrollTop - targetEl.clientHeight;
+                    isNearBottomRef.current = distanceFromBottom <= 80;
                     if (!offlineMode && hasMore && targetEl.scrollTop <= 20) {
                         loadMore();
                     }
