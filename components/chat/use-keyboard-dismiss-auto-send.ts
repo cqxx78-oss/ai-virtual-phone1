@@ -74,8 +74,6 @@ export function useKeyboardDismissAutoSend(
         // 输入框里已有草稿同理
         const draft = rootRef.current?.querySelector<HTMLTextAreaElement>(INPUT_SELECTOR);
         if (draft?.value.trim()) return;
-        // 如果当前正在编辑某条历史消息（弹出了编辑弹窗或编辑遮罩），绝不触发自动回复
-        if (rootRef.current?.querySelector(".chat-html-overlay, [data-active]")) return;
         if (!hasUnrepliedUserMessage(cur.sessionId)) return;
         cur.onTrigger();
     }, [rootRef, hasUnrepliedUserMessage]);
