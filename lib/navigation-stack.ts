@@ -10,37 +10,35 @@ let nextId = 1;
 const stack: NavEntry[] = [];
 let initialized = false;
 let desktopExitHandler: (() => void) | null = null;
-let pendingProgrammaticPops = 0;
+let isInternalPopping = false;
 
 function initGlobalPopStateListener() {
   if (typeof window === "undefined" || initialized) return;
   initialized = true;
 
-  // 桌面初始化时，向浏览器压入一个根底帧（nav: 0），用于捕获在桌面上按返回键的行为，防止直接退出 PWA
+  // 桌面初始化时，向浏览器压入基础底帧与哨兵防穿透帧
   try {
     window.history.replaceState({ nav: 0, __isDesktopRoot: true }, "");
     window.history.pushState({ nav: 0, __isDesktopRoot: true }, "");
   } catch {}
 
   window.addEventListener("popstate", (event) => {
-    // 如果是程序主动 popNav() 引起的历史回退，直接消耗配额，不再重复触发页面回退
-    if (pendingProgrammaticPops > 0) {
-      pendingProgrammaticPops--;
+    // 如果是内部程序同步调用引发的尾随事件，直接放行，不吞噬任何用户物理按键
+    if (isInternalPopping) {
+      isInternalPopping = false;
       return;
     }
 
-    // 读取浏览器历史当前的目标深度；没有状态或根层时目标深度为 0
-    let targetDepth = typeof event.state?.nav === "number" ? event.state.nav : 0;
-
-    // 前进场景钳制：若用户按了浏览器前进键，不盲目扩张栈，保证安全不越界
-    if (targetDepth > stack.length) {
-      targetDepth = stack.length;
+    // 【底座绝对锁死】：只要历史被按穿到了最底部（无有效状态或为 0），瞬间无条件推入哨兵帧补齐，
+    // 永远保证浏览器里有一张“免死金牌”上一页，物理层面上 100% 杜绝安卓系统直接关闭小手机应用！
+    if (!event.state || typeof event.state.nav !== "number" || event.state.nav <= 0) {
+      try {
+        window.history.pushState({ nav: Math.max(0, stack.length - 1), __isDesktopRoot: true }, "");
+      } catch {}
     }
 
-    const initialStackLength = stack.length;
-
-    // 目标深度收敛：只要当前栈深大于目标深度，依次平稳出栈回退，根除跳级与多级错位
-    while (stack.length > targetDepth) {
+    // 每次物理按键回退，只优雅出栈一层，杜绝“连按两下直接全退光”
+    if (stack.length > 0) {
       const top = stack.pop();
       if (top) {
         try {
@@ -49,17 +47,9 @@ function initGlobalPopStateListener() {
           console.error("[NavStack] Error in onPop handler:", err);
         }
       }
-    }
-
-    // 【桌面根层死锁】：只要栈已经清空（已经在桌面），无论怎么狂按返回键，
-    // 立刻向浏览器再推入一层哨兵底帧，将游标死死锁在当前网页内，绝不穿透闪退到手机系统桌面！
-    if (stack.length === 0) {
-      try {
-        window.history.pushState({ nav: 0, __isDesktopRoot: true }, "");
-      } catch {}
-
-      // 只有在【按键前本身就已经在桌面】时，才弹窗询问是否退出；刚从应用退回桌面时不弹窗
-      if (initialStackLength === 0 && desktopExitHandler) {
+    } else {
+      // 栈已经完全处于桌面根层，按返回键弹窗询问，且锁在当前页
+      if (desktopExitHandler) {
         desktopExitHandler();
       }
     }
@@ -99,23 +89,14 @@ export function pushNav(onPop: () => void, tag?: string): () => void {
   return () => {
     const idx = stack.findIndex(e => e.id === entryId);
     if (idx !== -1) {
-      const isTop = idx === stack.length - 1;
       stack.splice(idx, 1);
-      // 若组件因内部其他交互直接卸载且当前位于栈顶，顺便将浏览器的冗余死帧撤回，杜绝死帧堆积
-      if (isTop) {
-        pendingProgrammaticPops++;
-        try {
-          window.history.back();
-        } catch {}
-      }
     }
   };
 }
 
 /**
  * 主动回退一层：供屏幕左上角的 UI 返回按钮统一调用。
- * 核心优化：立刻同步执行栈顶的 onPop() 保证界面 100% 毫秒级秒退，
- * 同时向浏览器发出 history.back() 抹平浏览器历史记录，杜绝“点好几下没反应”。
+ * 立刻同步出栈并执行 onPop()，界面 100% 秒级跟手，同时安全同步历史记录。
  */
 export function popNav(): void {
   if (typeof window === "undefined") return;
@@ -128,10 +109,12 @@ export function popNav(): void {
         console.error("[NavStack] Error in immediate onPop handler:", err);
       }
     }
-    pendingProgrammaticPops++;
+    isInternalPopping = true;
     try {
       window.history.back();
-    } catch {}
+    } catch {
+      isInternalPopping = false;
+    }
   }
 }
 
