@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, useEffect, useLayoutEffect } from "react";
-import { CheckCircle2, Circle, FileJson, Layers, LoaderCircle, MoreHorizontal, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
+import { CheckCircle2, Circle, FileJson, Layers, LoaderCircle, MoreHorizontal, PackageCheck, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 
 import type { InstalledCustomApp } from "@/lib/custom-app-types";
 import {
@@ -2074,7 +2074,21 @@ export function CustomAppRunner({
                 )}
               </div>
               {menuActionError ? <div className="app-market-error" role="alert">{menuActionError}</div> : null}
-              <div className="app-market-sheet-actions">
+              <div className="app-market-sheet-actions three">
+                <button
+                  type="button"
+                  className="app-market-secondary"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent("custom-app:place-desktop", { detail: { appId: app.id } }));
+                    onNotice?.(`已将「${app.name}」放到桌面 ✓`);
+                    setMenuOpen(false);
+                  }}
+                  disabled={updating}
+                  title="在桌面生成/恢复快捷图标"
+                >
+                  <PackageCheck size={18} />
+                  <span>加到桌面</span>
+                </button>
                 <button type="button" className="app-market-secondary" onClick={() => void updateCurrentApp()} disabled={updating}>
                   {updating ? <LoaderCircle className="am-spin" size={18} /> : <RefreshCw size={18} />}
                   <span>{updating ? "更新中" : "更新"}</span>
