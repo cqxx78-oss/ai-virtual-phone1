@@ -2419,11 +2419,15 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
         break;
       }
       const trimmed = trimEmptyTrailingPages(next, widgets);
+      layoutRef.current = trimmed;
       kvSet(ICON_LAYOUT_STORAGE_KEY, JSON.stringify(trimmed));
       return trimmed;
     });
+    // 强制关闭当前打开的应用，返回桌面，并翻页到目标页面
+    setActiveApp(null);
     if (placedPageNumber) {
-      window.setTimeout(() => setCurrentPageIndex(Math.max(0, (placedPageNumber ?? 1) - 1)), 0);
+      const targetPage = placedPageNumber;
+      window.setTimeout(() => setCurrentPageIndex(Math.max(0, targetPage - 1)), 50);
     }
   }, []);
   handleInstallCustomAppToDesktopRef.current = handleInstallCustomAppToDesktop;
