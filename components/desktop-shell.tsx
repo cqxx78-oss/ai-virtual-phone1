@@ -2386,10 +2386,24 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
     setLayout(prev => {
       const widgets = widgetsRef.current;
       const next = cloneDesktopLayout(prev, widgets);
-      if (getDesktopIconLayoutItems(next).some(icon => icon.id === iconId)
-        || dockRef.current.includes(iconId)
-        || Object.values(foldersRef.current).some(folder => folder.icons.includes(iconId))) {
-        return next;
+      // 只清理桌面布局数组中的旧坐标（绝对不碰应用数据和数据库），强制重新排布
+      for (const pageKey of getDesktopPageKeys(next)) {
+        next[pageKey] = (next[pageKey] ?? []).filter(icon => icon.id !== iconId);
+      }
+      if (dockRef.current.includes(iconId)) {
+        dockRef.current = dockRef.current.filter(id => id !== iconId);
+        setDock(dockRef.current);
+        writeDockLayout(dockRef.current);
+      }
+      for (const [folderId, folder] of Object.entries(foldersRef.current)) {
+        if (folder.icons.includes(iconId)) {
+          foldersRef.current = {
+            ...foldersRef.current,
+            [folderId]: { ...folder, icons: folder.icons.filter(id => id !== iconId) },
+          };
+          setFolders(foldersRef.current);
+          writeDesktopFolders(foldersRef.current);
+        }
       }
       const pageNumbers = getDesktopPageKeysForState(next, widgets).map(getDesktopPageNumber);
       const maxPage = Math.max(2, ...pageNumbers);
