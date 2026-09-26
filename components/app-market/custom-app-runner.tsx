@@ -2079,9 +2079,10 @@ export function CustomAppRunner({
                   type="button"
                   className="app-market-secondary"
                   onClick={() => {
-                    window.dispatchEvent(new CustomEvent("custom-app:place-desktop", { detail: { appId: app.id } }));
+                    window.dispatchEvent(new CustomEvent("ai-phone-custom-app-place-desktop", { detail: { appId: app.id } }));
                     onNotice?.(`已将「${app.name}」放到桌面 ✓`);
                     setMenuOpen(false);
+                    onClose();
                   }}
                   disabled={updating}
                   title="在桌面生成/恢复快捷图标"
