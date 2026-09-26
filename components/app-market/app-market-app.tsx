@@ -1586,7 +1586,7 @@ export function AppMarketApp({ onClose, onOpenCustomApp, onInstallToDesktop, onN
                 )}
               </div>
               {installedActionError ? <div className="app-market-error" role="alert">{installedActionError}</div> : null}
-              <div className="app-market-sheet-actions three">
+              <div className="app-market-sheet-actions" style={{ gridTemplateColumns: "1fr 1fr 1fr 1.2fr", gap: "6px" }}>
                 <button
                   type="button"
                   className="app-market-secondary"
@@ -1596,6 +1596,20 @@ export function AppMarketApp({ onClose, onOpenCustomApp, onInstallToDesktop, onN
                 >
                   {selectedInstalledUpdating ? <LoaderCircle className="am-spin" size={18} /> : <RefreshCw size={18} />}
                   <span>{selectedInstalledUpdating ? "更新中" : "更新"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="app-market-secondary"
+                  onClick={() => {
+                    onInstallToDesktop(selectedInstalledApp);
+                    onNotice?.(`已将「${selectedInstalledApp.name}」放到桌面 ✓`);
+                    setSelectedInstalledApp(null);
+                  }}
+                  disabled={selectedInstalledUpdating}
+                  title="在桌面生成/恢复快捷图标"
+                >
+                  <PackageCheck size={18} />
+                  <span>加到桌面</span>
                 </button>
                 <button type="button" className="app-market-danger" onClick={() => setConfirmDelete(selectedInstalledApp)} disabled={selectedInstalledUpdating}>
                   <Trash2 size={18} />
