@@ -177,9 +177,21 @@ export function DesktopCustomizer({ draft, onDraftChange, onApply, onClose }: De
         <span className="ts-16 font-medium text-[var(--c-text-title)] flex items-center gap-2">
           <Palette size={18} /> 个性化装扮
         </span>
-        <button onClick={onClose} className="p-1.5 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("refresh-desktop-custom-apps"));
+              window.dispatchEvent(new CustomEvent("global-notice", { detail: "已补齐未放置的 App 图标 ✓" }));
+            }}
+            className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs text-gray-600 transition-colors"
+            title="将未在桌面上显示的已安装 App 补回桌面"
+          >
+            补齐图标
+          </button>
+          <button onClick={onClose} className="p-1.5 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="px-6 py-3 flex gap-2 w-full">

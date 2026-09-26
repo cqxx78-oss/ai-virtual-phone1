@@ -528,7 +528,11 @@ function normalizeLayout(raw: unknown, widgets: WidgetInstance[], dockIds: Set<D
     allPlaced.add(id);
   }
 
-  return trimEmptyTrailingPages(layout, widgets);
+  // 兜底自愈已安装的自定义 App：如果某个 App 安装了但没有出现在任何页面、dock 或文件夹中，
+  // 自动将其排上桌面，防止拖拽丢落后永久变成幽灵状态
+  const missingCustomApps = appendMissingCustomAppIcons(layout, widgets, Array.from(dockIds));
+
+  return trimEmptyTrailingPages(missingCustomApps, widgets);
 }
 
 /**
@@ -1568,7 +1572,11 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       });
     };
     window.addEventListener(CUSTOM_APPS_UPDATED_EVENT, refreshCustomApps);
-    return () => window.removeEventListener(CUSTOM_APPS_UPDATED_EVENT, refreshCustomApps);
+    window.addEventListener("refresh-desktop-custom-apps", refreshCustomApps);
+    return () => {
+      window.removeEventListener(CUSTOM_APPS_UPDATED_EVENT, refreshCustomApps);
+      window.removeEventListener("refresh-desktop-custom-apps", refreshCustomApps);
+    };
   }, []);
 
   // 其他模块（如工坊 agent 装应用）请求把已安装应用的图标摆上桌面
@@ -2633,14 +2641,17 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
     setEditMode(false);
     setShowDesktopCustomizer(false);
     setShowWidgetPicker(false);
-    setShowWidgetPicker(false);
     setDragItem(null);
     setDropTarget(null);
     editDragRef.current = null;
     editTapRef.current = null;
     if (ghostRef.current) ghostRef.current.style.display = "none";
+    // 退出编辑时兜底自愈：检查是否有已安装的自定义 App 意外从桌面脱落，有则自动补回空位
+    const healedLayout = appendMissingCustomAppIcons(layoutRef.current, widgetsRef.current, dockRef.current);
+    layoutRef.current = healedLayout;
+    setLayout(healedLayout);
     // Save layout, dock, folders and widgets once on exit
-    kvSet(ICON_LAYOUT_STORAGE_KEY, JSON.stringify(layoutRef.current));
+    kvSet(ICON_LAYOUT_STORAGE_KEY, JSON.stringify(healedLayout));
     kvSet(DOCK_LAYOUT_STORAGE_KEY, JSON.stringify(dockRef.current));
     writeDesktopFolders(foldersRef.current);
     saveWidgets(widgetsRef.current);
