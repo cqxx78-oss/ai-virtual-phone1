@@ -1578,8 +1578,10 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   useEffect(() => {
     const placeHandler = (e: Event) => {
       const appId = (e as CustomEvent).detail?.appId;
-      if (typeof appId !== "string" || !appId) return;
-      const app = loadInstalledCustomApps().find(item => item.id === appId);
+      if (!appId) return;
+      const targetAppId = String(appId).trim();
+      const allInstalled = loadInstalledCustomApps();
+      const app = allInstalled.find(item => item.id === targetAppId || item.name === targetAppId);
       if (app) handleInstallCustomAppToDesktopRef.current?.(app);
     };
     window.addEventListener(CUSTOM_APP_PLACE_DESKTOP_EVENT, placeHandler);
